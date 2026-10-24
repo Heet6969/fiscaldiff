@@ -72,8 +72,81 @@ could be mistaken for real data, and never describe work as done when it is not.
   ones in use. Do not write aspirational or decorative Kiro files that do not reflect
   how the project is really built.
 
+## 8. Scope of the application
+
+FiscalDiff answers three connected questions from one shared data model and one
+shared calculation engine:
+
+1. **Compare proposals** — the budget impact of what a union requests.
+2. **Review overtime** — unusual overtime patterns flagged for human review.
+3. **Check a stated cost** — whether a stated financial impact matches the agreement
+   terms and verified inputs. This is the original FiscalDiff function and is
+   mandatory, not optional.
+
+No view may hold its own copy of a cost formula. Any figure appearing in more than one
+view must come from the same engine call on the same records, so the three views
+cannot contradict each other.
+
+The MVP is a browser-only static application: no backend, no database, no account, no
+payroll connection, and no runtime AI service. Kiro is the development tool; the
+shipped application does not call a language model. Uploaded data stays in the
+browser.
+
+## 9. Terminology discipline
+
+The intended reader is a nontechnical municipal finance employee. Wording carries
+legal and reputational weight, so these substitutions are binding:
+
+| Never write | Write |
+|---|---|
+| City fiscal deficit | Workforce budget shortfall |
+| Fraud, misconduct, abuse | Needs review |
+| Incorrect pay, overpayment | Needs review |
+| Proven error, wrong figure | Difference requiring review |
+| AI-extracted, intelligently parsed | Manually entered / fixed-format import |
+| Fair pay, justified market rate | Comparison context |
+
+Additional rules:
+
+- Keep **total proposed expenditure**, **increase over baseline**, and **budget
+  remaining or shortfall** as three separately labeled figures. Never let one stand in
+  for another.
+- Never infer the cause of an overtime fluctuation.
+- Never call a difference an error until assumptions and scope have been confirmed.
+- Never compare total payroll against an incremental-cost claim.
+- Never state that a comparator table establishes fair pay.
+
+## 10. Design restraint
+
+The interface is for someone competent with money and unfamiliar with software. It
+should read like a well-made form.
+
+- Three plainly labeled views, nothing more.
+- A persistent, unobtrusive "Synthetic demo data" indicator in every view.
+- Clear language, restrained styling, generous spacing, readable numbers, few controls.
+- No animations, decorative charts, endless cards, or configuration panels.
+- Detailed assumptions and calculation steps go behind clearly labeled expandable
+  sections, collapsed by default.
+- Incomplete-input warnings stay visible and are never collapsed.
+- No dead buttons, fake integrations, or placeholder success messages.
+
+## 11. Honest capability claims
+
+- Manual entry and fixed-format CSV parsing are never described as AI extraction or
+  general document understanding.
+- Future possibilities — authorized Munis exports or APIs, broader budgeting, document
+  extraction — appear only in a README roadmap labeled "Not implemented". Never imply
+  current compatibility and never display a connection control that does nothing.
+- Monthly proration is disclosed as a simplifying assumption, never presented as a
+  reproduction of an actual payroll calendar.
+- Incomplete applicable inputs must prevent an unsupported complete-cost result. A
+  clearly labeled partial estimate is allowed; a confident total built on gaps is not.
+
 ## Current status
 
-Implementation has not started. The repository contains setup files only. Any claim
-that a feature, calculation, or test exists must be verified against the repository
-before it is stated.
+Specifications only. The spec at `.kiro/specs/workforce-budget-impact/` is written and
+under review; **no application code, no tests, and no hook exist yet**, and Node.js is
+not yet installed on the development machine.
+
+Any claim that a feature, calculation, test result, or hook execution exists must be
+verified against the repository before it is stated.
