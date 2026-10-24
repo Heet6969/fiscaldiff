@@ -9,9 +9,15 @@
  *    legend and in the data table;
  *  - months with no recorded value leave a gap rather than being joined across.
  *
+ * Interaction: hovering, focusing or tapping a month shows the month, the
+ * selected measure with its exact formatted value, any budget shown on the
+ * chart, and "Needs review" when that month is flagged. A month with no value
+ * says so in words. It is never presented as zero.
+ *
  * Values arrive from the engine already computed. This component only maps
  * them to pixels.
  */
+import { ChartStage, type ChartTarget } from './charts/ChartStage';
 import { niceTicks, useMeasuredWidth } from './charts/chartUtils';
 
 export type ChartPoint = {
@@ -20,6 +26,10 @@ export type ChartPoint = {
   readonly value: number | undefined;
   readonly flagged: boolean;
   readonly budget: number | undefined;
+  /** The value formatted for display, or the reason there is none. */
+  readonly valueText: string;
+  /** Extra tooltip lines, such as the budget when it is drawn. */
+  readonly extraLines: readonly string[];
 };
 
 const HEIGHT = 290;
@@ -108,131 +118,203 @@ export function TrendChart({
   const gapCount = points.filter((p) => p.value === undefined).length;
   const crossesZero = d0 < 0 && d1 > 0;
 
+  const pointId = (point: ChartPoint) => `m:${point.shortLabel}`;
+
+  const spacing = plotW / (points.length - 1);
+  const crowded = spacing < 26;
+
+  const targets: ChartTarget[] = points.map((point, index) => {
+    const cx = x(index);
+    const tooltip = {
+      title: point.label,
+      lines: [`${metricLabel}: ${point.valueText}`, ...point.extraLines],
+      ...(point.flagged ? { badge: 'Needs review' } : {}),
+    };
+    if (point.value === undefined) {
+      // A month with no value stays a visible, named gap.
+      return {
+        id: pointId(point),
+        shape: 'rect' as const,
+        box: { x: cx - Math.min(9, spacing / 2), y: PAD_TOP, w: Math.min(18, spacing), h: plotH },
+        tooltip,
+      };
+    }
+    if (crowded) {
+      // Months are closer together than a comfortable target, so each one gets
+      // a full-height strip exactly as wide as its slot. Neighbouring targets
+      // never overlap, and a tap anywhere in the column picks that month.
+      return {
+        id: pointId(point),
+        shape: 'rect' as const,
+        box: { x: cx - spacing / 2, y: PAD_TOP, w: spacing, h: plotH },
+        tooltip,
+      };
+    }
+    const cy = y(point.value);
+    return {
+      id: pointId(point),
+      shape: 'circle' as const,
+      box: { x: cx - 13, y: cy - 13, w: 26, h: 26 },
+      tooltip,
+    };
+  });
+
   return (
     <figure className="chart-figure">
       <div className="chart-box" ref={ref}>
-        <svg
-          className="chart"
+        <ChartStage
           width={W}
           height={HEIGHT}
-          viewBox={`0 0 ${W} ${HEIGHT}`}
-          role="img"
-          aria-label={`Line chart of ${metricLabel}. ${summary}`}
+          targets={targets}
+          groupLabel={`Chart data points for ${metricLabel}. Use the left and right arrow keys to move between months.`}
         >
-          <text className="chart__axis-title" x={PAD_LEFT} y={14}>
-            {axisTitle}
-          </text>
+          {({ activeId }) => {
+            const activeIndex = points.findIndex((p) => pointId(p) === activeId);
+            const activePoint = activeIndex >= 0 ? points[activeIndex] : undefined;
 
-          {ticks.map((tick) => (
-            <g key={tick}>
-              <line
-                className="chart__gridline"
-                x1={PAD_LEFT}
-                x2={W - PAD_RIGHT}
-                y1={y(tick)}
-                y2={y(tick)}
-              />
-              <text className="chart__label" x={PAD_LEFT - 8} y={y(tick) + 4} textAnchor="end">
-                {formatTick(tick)}
-              </text>
-            </g>
-          ))}
+            return (
+              <svg
+                className="chart"
+                width={W}
+                height={HEIGHT}
+                viewBox={`0 0 ${W} ${HEIGHT}`}
+                role="img"
+                aria-label={`Line chart of ${metricLabel}. ${summary}`}
+              >
+                <text className="chart__axis-title" x={PAD_LEFT} y={14}>
+                  {axisTitle}
+                </text>
 
-          <line
-            className="chart__axis"
-            x1={PAD_LEFT}
-            x2={PAD_LEFT}
-            y1={PAD_TOP}
-            y2={PAD_TOP + plotH}
-          />
-          <line
-            className="chart__axis"
-            x1={PAD_LEFT}
-            x2={W - PAD_RIGHT}
-            y1={PAD_TOP + plotH}
-            y2={PAD_TOP + plotH}
-          />
-          {emphasiseZero && crossesZero ? (
-            <line
-              className="chart__zero"
-              x1={PAD_LEFT}
-              x2={W - PAD_RIGHT}
-              y1={y(0)}
-              y2={y(0)}
-            />
-          ) : null}
+                {ticks.map((tick) => (
+                  <g key={tick}>
+                    <line
+                      className="chart__gridline"
+                      x1={PAD_LEFT}
+                      x2={W - PAD_RIGHT}
+                      y1={y(tick)}
+                      y2={y(tick)}
+                    />
+                    <text className="chart__label" x={PAD_LEFT - 8} y={y(tick) + 4} textAnchor="end">
+                      {formatTick(tick)}
+                    </text>
+                  </g>
+                ))}
 
-          {points.map((point, index) =>
-            point.flagged ? (
-              <rect
-                key={`band-${point.label}`}
-                className="chart__flag-band"
-                x={x(index) - 7}
-                y={PAD_TOP}
-                width={14}
-                height={plotH}
-              />
-            ) : null,
-          )}
-
-          {budgetRuns.map((run) => (
-            <polyline
-              key={`budget-${run[0]?.index ?? 0}`}
-              className="chart__budget"
-              points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
-            />
-          ))}
-
-          {valueRuns.map((run) => (
-            <polyline
-              key={`line-${run[0]?.index ?? 0}`}
-              className="chart__line"
-              points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
-            />
-          ))}
-
-          {points.map((point, index) => {
-            if (point.value === undefined) {
-              return (
                 <line
-                  key={`gap-${point.label}`}
-                  className="chart__gap"
-                  x1={x(index)}
-                  x2={x(index)}
+                  className="chart__axis"
+                  x1={PAD_LEFT}
+                  x2={PAD_LEFT}
                   y1={PAD_TOP}
                   y2={PAD_TOP + plotH}
                 />
-              );
-            }
-            const cx = x(index);
-            const cy = y(point.value);
-            return point.flagged ? (
-              <polygon
-                key={`pt-${point.label}`}
-                className="chart__flag"
-                points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`}
-              >
-                <title>{`${point.label}: Needs review`}</title>
-              </polygon>
-            ) : (
-              <circle key={`pt-${point.label}`} className="chart__point" cx={cx} cy={cy} r={2.75} />
-            );
-          })}
+                <line
+                  className="chart__axis"
+                  x1={PAD_LEFT}
+                  x2={W - PAD_RIGHT}
+                  y1={PAD_TOP + plotH}
+                  y2={PAD_TOP + plotH}
+                />
+                {emphasiseZero && crossesZero ? (
+                  <line
+                    className="chart__zero"
+                    x1={PAD_LEFT}
+                    x2={W - PAD_RIGHT}
+                    y1={y(0)}
+                    y2={y(0)}
+                  />
+                ) : null}
 
-          {points.map((point, index) =>
-            index % labelStep === 0 ? (
-              <text
-                key={`lbl-${point.label}`}
-                className="chart__label"
-                x={x(index)}
-                y={PAD_TOP + plotH + 18}
-                textAnchor="middle"
-              >
-                {point.shortLabel}
-              </text>
-            ) : null,
-          )}
-        </svg>
+                {points.map((point, index) =>
+                  point.flagged ? (
+                    <rect
+                      key={`band-${point.label}`}
+                      className="chart__flag-band"
+                      x={x(index) - 7}
+                      y={PAD_TOP}
+                      width={14}
+                      height={plotH}
+                    />
+                  ) : null,
+                )}
+
+                {activePoint ? (
+                  <line
+                    className="chart__guide"
+                    x1={x(activeIndex)}
+                    x2={x(activeIndex)}
+                    y1={PAD_TOP}
+                    y2={PAD_TOP + plotH}
+                  />
+                ) : null}
+
+                {budgetRuns.map((run) => (
+                  <polyline
+                    key={`budget-${run[0]?.index ?? 0}`}
+                    className="chart__budget"
+                    points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
+                  />
+                ))}
+
+                {valueRuns.map((run) => (
+                  <polyline
+                    key={`line-${run[0]?.index ?? 0}`}
+                    className="chart__line"
+                    points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
+                  />
+                ))}
+
+                {points.map((point, index) => {
+                  if (point.value === undefined) {
+                    return (
+                      <line
+                        key={`gap-${point.label}`}
+                        className={`chart__gap${activeId === pointId(point) ? ' is-active' : ''}`}
+                        x1={x(index)}
+                        x2={x(index)}
+                        y1={PAD_TOP}
+                        y2={PAD_TOP + plotH}
+                      />
+                    );
+                  }
+                  const cx = x(index);
+                  const cy = y(point.value);
+                  return (
+                    <g key={`pt-${point.label}`}>
+                      <circle
+                        className={`chart__halo${activeId === pointId(point) ? ' is-active' : ''}`}
+                        cx={cx}
+                        cy={cy}
+                        r={11}
+                      />
+                      {point.flagged ? (
+                        <polygon
+                          className="chart__flag"
+                          points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`}
+                        />
+                      ) : (
+                        <circle className="chart__point" cx={cx} cy={cy} r={2.75} />
+                      )}
+                    </g>
+                  );
+                })}
+
+                {points.map((point, index) =>
+                  index % labelStep === 0 ? (
+                    <text
+                      key={`lbl-${point.label}`}
+                      className="chart__label"
+                      x={x(index)}
+                      y={PAD_TOP + plotH + 18}
+                      textAnchor="middle"
+                    >
+                      {point.shortLabel}
+                    </text>
+                  ) : null,
+                )}
+              </svg>
+            );
+          }}
+        </ChartStage>
       </div>
 
       <ul className="legend legend--inline" aria-label="Chart legend">
@@ -256,9 +338,11 @@ export function TrendChart({
       </ul>
 
       <figcaption className="figure-note">
-        {summary} {zeroBased || emphasiseZero ? 'The vertical axis includes zero.' : 'The vertical axis does not start at zero.'}
+        {summary}{' '}
+        {zeroBased || emphasiseZero
+          ? 'The vertical axis includes zero.'
+          : 'The vertical axis does not start at zero.'}
       </figcaption>
     </figure>
   );
 }
-

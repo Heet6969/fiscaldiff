@@ -7,6 +7,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { useState } from 'react';
 import { formatUSD, fromCents, type Money } from '../../../money/money';
+import type { ValueState } from '../../../domain/types';
 
 /** Tracks an element's rendered width so chart text stays a constant size. */
 export function useMeasuredWidth(fallback = 640): [RefObject<HTMLDivElement | null>, number] {
@@ -70,6 +71,33 @@ export function centsToNumber(money: Money): number {
 export function usdTick(value: number): string {
   const showCents = !Number.isInteger(value);
   return formatUSD(fromCents(BigInt(Math.round(value * 100))), { showCents });
+}
+
+/**
+ * A part as a percentage of a whole, to one decimal place, from exact cents.
+ *
+ * Returns undefined unless the denominator is a positive amount and the part is
+ * not negative, so a percentage is never shown for a missing, zero or otherwise
+ * unclear denominator. Display only; nothing here feeds a calculation.
+ */
+export function shareOfTotal(part: Money, total: Money): string | undefined {
+  if (total.cents <= 0n || part.cents < 0n) return undefined;
+  const tenths = (part.cents * 1000n + total.cents / 2n) / total.cents;
+  return `${tenths / 10n}.${tenths % 10n}%`;
+}
+
+/** Plain-words label for an amount that may not be a number. Never "$0.00". */
+export function describeAmount(state: ValueState<Money>): string {
+  switch (state.kind) {
+    case 'known':
+      return formatUSD(state.value);
+    case 'excluded':
+      return 'Excluded';
+    case 'missing':
+      return 'Missing';
+    case 'unknown':
+      return 'Unknown';
+  }
 }
 
 export function groupedNumber(value: number): string {

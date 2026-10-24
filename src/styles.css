@@ -824,6 +824,136 @@ details.inline-details > fieldset {
   color: var(--navy);
 }
 
+/* ---------- Chart interaction ---------- */
+
+.chart-stage {
+  position: relative;
+}
+.chart-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Transparent buttons laid over each data point. They carry the hover, focus
+   and tap behaviour and the accessible name. */
+.chart-target {
+  appearance: none;
+  position: absolute;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  pointer-events: auto;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+.chart-target--circle {
+  border-radius: 50%;
+}
+.chart-target:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* Gentle highlight: the chosen shape stays full strength, the rest recede. */
+.seg {
+  transition:
+    opacity 150ms ease,
+    stroke-width 150ms ease,
+    stroke 150ms ease;
+}
+.chart-stage.is-engaged .seg:not(.is-active) {
+  opacity: 0.55;
+}
+.seg.is-active {
+  stroke: var(--navy);
+  stroke-width: 2;
+}
+.chart__halo {
+  fill: var(--teal);
+  fill-opacity: 0.18;
+  stroke: var(--teal);
+  stroke-width: 1.5;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.chart__halo.is-active {
+  opacity: 1;
+}
+.chart__guide {
+  stroke: var(--navy);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+}
+.chart__gap {
+  transition: stroke 150ms ease;
+}
+.chart__gap.is-active {
+  stroke: var(--navy);
+  stroke-dasharray: none;
+  stroke-width: 1.5;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 2rem));
+  padding: 0.5rem 0.65rem;
+  background: var(--navy);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(20, 40, 75, 0.28);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  /* Never intercepts clicks, so it cannot block a control beneath it. */
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 150ms ease,
+    visibility 0s linear 150ms;
+}
+.chart-tooltip.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 150ms ease,
+    visibility 0s;
+}
+.chart-tooltip__title {
+  font-weight: 650;
+}
+.chart-tooltip__line {
+  font-variant-numeric: tabular-nums;
+}
+.chart-tooltip__badge {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--amber-border);
+  border-radius: 3px;
+  background: var(--amber-bg);
+  color: var(--amber-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg,
+  .chart__halo,
+  .chart__gap,
+  .chart-tooltip,
+  .chart-tooltip.is-visible {
+    transition: none;
+  }
+}
+
 /* ---------- Flags ---------- */
 
 .flag-list {
@@ -1015,6 +1145,11 @@ details.inline-details > fieldset {
   .surface {
     border-color: #999;
     break-inside: avoid;
+  }
+  /* Interaction exists for the screen only. */
+  .chart-overlay,
+  .chart-tooltip {
+    display: none !important;
   }
   table {
     break-inside: auto;

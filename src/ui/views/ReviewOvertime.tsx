@@ -98,14 +98,25 @@ export function ReviewOvertime() {
 
   const points = useMemo<ChartPoint[]>(
     () =>
-      rows.map((row) => ({
-        label: formatYearMonthLong(row.month),
-        shortLabel: row.month,
-        value: metricValue(row, metric),
-        flagged: flaggedMonths.has(row.month),
-        budget: row.budget && row.budget.kind === 'known' ? centsToNumber(row.budget.value) : undefined,
-      })),
-    [rows, metric, flaggedMonths],
+      rows.map((row) => {
+        const value = metricValue(row, metric);
+        const budget =
+          row.budget && row.budget.kind === 'known' ? centsToNumber(row.budget.value) : undefined;
+        return {
+          label: formatYearMonthLong(row.month),
+          shortLabel: row.month,
+          value,
+          flagged: flaggedMonths.has(row.month),
+          budget,
+          // A month without a value says why, in words. It is never shown as zero.
+          valueText: value === undefined ? missingText(row, metric) : config.formatValue(value),
+          extraLines:
+            config.showBudget && budget !== undefined
+              ? [`Monthly overtime budget: ${dollars(budget, 2)}`]
+              : [],
+        };
+      }),
+    [rows, metric, flaggedMonths, config],
   );
 
   const knownCount = points.filter((p) => p.value !== undefined).length;
@@ -410,6 +421,28 @@ function metricValue(row: MonthlyOvertimeRow, metric: Metric): number | undefine
       return row.budgetVariance.kind === 'computed'
         ? centsToNumber(row.budgetVariance.variance)
         : undefined;
+  }
+}
+
+function stateWord(kind: 'known' | 'missing' | 'unknown' | 'excluded'): string {
+  if (kind === 'unknown') return 'Unknown';
+  if (kind === 'excluded') return 'Excluded';
+  return 'Missing — no recorded value';
+}
+
+/** Why a month has no point for the selected measure. */
+function missingText(row: MonthlyOvertimeRow, metric: Metric): string {
+  switch (metric) {
+    case 'hours':
+      return stateWord(row.hours.kind);
+    case 'dollars':
+      return stateWord(row.dollars.kind);
+    case 'effective':
+      return 'Not enough comparable data';
+    case 'variance':
+      return row.budgetVariance.kind === 'no-budget'
+        ? 'No budget entered'
+        : 'Not enough comparable data';
   }
 }
 

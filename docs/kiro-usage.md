@@ -296,3 +296,40 @@ file was opened in Microsoft Excel 16.0 through its automation interface: the ti
 "Offer A — union request" displayed correctly, 0 of 528 cells showed mojibake, and the
 difference cell was a number (`-25000`), not text. That was an automated read of cell
 values, not a visual inspection of the window.
+
+### 2026-10-24 — Chart interactions
+
+Added hover, keyboard and touch interaction to the three existing charts, with no new
+dependency and no change to any calculation (`git diff` over `src/engine`, `src/money`,
+`src/domain` and `src/data` is empty, so the unit and financial suites were not re-run).
+
+**How it works.** The SVGs are unchanged and keep their `role="img"` labels and text
+equivalents. A shared layer, `src/ui/components/charts/ChartStage.tsx`, puts a transparent
+`<button>` over each data point. Buttons rather than focusable SVG children, because an
+SVG with `role="img"` treats its children as presentational and would hide them. Each
+button's accessible name carries the tooltip text, so the visual tooltip is
+`aria-hidden`. The layer is one tab stop; arrow keys, Home and End move between points,
+Escape dismisses. Mouse hover is handled for mouse pointers only; touch and pen taps pin
+the tooltip, and tapping again or elsewhere dismisses it.
+
+**Tooltips.** Segment and bar tooltips show the exact formatted value. A percentage is
+shown only when its denominator is clear: a segment's share of its offer's current-year
+total (known, positive, no negative component), and the stated amount as a share of the
+calculated amount (positive). Each says what it is a percentage of. Overtime tooltips show
+the month, the selected measure with its unit, the budget only on the dollars view, and
+"Needs review" when flagged. Excluded, missing and unknown values are named in words and
+are never shown as zero; a known zero is still $0.00.
+
+**A bug the tests found.** At phone width the 24 months are about 10px apart and the
+26px targets overlapped, so a later month covered an earlier one and could not be
+hovered. Targets are now full-height strips exactly one slot wide whenever spacing is
+under 26px.
+
+**Tests.** `tests/e2e/chartInteraction.spec.ts`: 28 tests covering hover, the 120–180ms
+transition, keyboard, touch, tooltip placement inside desktop and phone-width viewports,
+pointer-events on the tooltip, missing and excluded data, reduced motion, print, and axe
+with a tooltip open on each chart.
+
+**Limitations.** Touch was tested with Playwright's touch emulation, not on a physical
+device. The reduced-motion and print behaviour were checked from computed styles, not by
+printing. Tooltip text is spoken through the button labels rather than as a tooltip.
