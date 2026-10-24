@@ -174,9 +174,16 @@ test.describe('core journey', () => {
     // Derived from base pay, so the raise lifts the rate for half the year.
     await expect(overtimeRow).toContainText('$3,276.00');
 
+    // The overtime assumptions are collapsed, but their current setting is
+    // always stated in the summary line.
+    const offerA = page.getByRole('group', { name: /Offer A/ });
+    await expect(offerA.locator('summary', { hasText: 'Overtime assumptions' })).toContainText(
+      'Rate derived from base pay × 1.5, 420 hours a month',
+    );
+    await offerA.locator('summary', { hasText: 'Overtime assumptions' }).click();
+
     // Raising modeled hours from the baseline 420 to 600 adds the extra hours
     // at the overtime rate, plus the rate uplift on the applicable months.
-    const offerA = page.getByRole('group', { name: /Offer A/ });
     await offerA.getByLabel(/Modeled overtime hours per month/).fill('600');
     await expect(overtimeRow).toContainText('$98,143.20');
 
@@ -238,6 +245,8 @@ test.describe('core journey', () => {
       page.getByRole('img', { name: /Line chart of Overtime hours per month/ }),
     ).toBeVisible();
 
+    // The full table is available behind a labeled section.
+    await disclosure(page, 'Monthly records').click();
     const table = page.getByRole('table').filter({ hasText: 'Effective hourly cost' });
     await expect(table.locator('tbody tr')).toHaveCount(24);
 
@@ -264,6 +273,7 @@ test.describe('core journey', () => {
 
     expect(await page.locator('.flag').count()).toBeGreaterThan(0);
 
+    await disclosure(page, 'Review thresholds').click();
     await page.getByLabel(/Flag an hours increase of at least/).fill('500');
     await expect(page.locator('.flag').filter({ hasText: 'Overtime hours up' })).toHaveCount(0);
   });
@@ -334,7 +344,10 @@ test.describe('core journey', () => {
       page.getByRole('row', { name: /Difference \(stated − calculated\)/ }),
     ).toContainText('-$25,000.00');
     await expect(page.getByText(/ratification payment is \$45,000/).first()).toBeVisible();
-    await expect(page.getByText(/Monthly proration/).first()).toBeVisible();
+    // Scoped to this view's panel: every view stays mounted, so an unscoped
+    // query would find the Compare view's own collapsed copy first.
+    const statedPanel = page.locator('#panel-stated');
+    await expect(statedPanel.getByText(/Monthly proration/).first()).toBeVisible();
     await expect(page.getByRole('row', { name: /Base-pay increase/ }).first()).toContainText(
       '$45,000.00',
     );

@@ -2,24 +2,47 @@
  * Compare proposals.
  *
  * Total proposed expenditure, increase over baseline, and budget remaining or
- * shortfall are three separately labeled rows. They are easy to conflate and
- * expensive to conflate, so they never share a label.
+ * shortfall are separately labeled. They are easy to conflate and expensive to
+ * conflate, so they never share a label.
+ *
+ * The chart and the key-result strip read the same engine output as the table;
+ * nothing here recomputes a figure.
  */
 import { useMemo } from 'react';
 import { useAppState } from '../state/AppState';
-import { Amount, CompletenessNotice, Disclosure, ExclusionsNote, WarningList } from '../components/Common';
+import {
+  Amount,
+  CompletenessNotice,
+  Disclosure,
+  ExclusionsNote,
+  WarningList,
+} from '../components/Common';
 import { MoneyField } from '../components/Fields';
 import { OfferForm } from '../components/OfferForm';
 import { AssumptionsList, StepsTable } from '../components/StepsTable';
 import { ComparatorTable } from '../components/ComparatorTable';
+import { StackedCostChart, type StackedOffer } from '../components/charts/StackedCostChart';
 import { overtimeStressTest, type OfferResult } from '../../engine';
 import type { BudgetPosition } from '../../engine/offer';
-import { formatUSD } from '../../money/money';
+import { formatSignedUSD, formatUSD, type Money } from '../../money/money';
 import type { OfferId } from '../../domain/dataset';
 import type { ValueState } from '../../domain/types';
-import type { Money } from '../../money/money';
 
 const OFFER_IDS: readonly OfferId[] = ['A', 'B'];
+
+function toStacked(result: OfferResult, id: string): StackedOffer {
+  return {
+    id,
+    label: result.label,
+    segments: [
+      { key: 'base', label: 'Base-pay increase', state: result.currentYearBasePayIncrement },
+      { key: 'overtime', label: 'Overtime increase', state: result.currentYearOvertimeIncrement },
+      { key: 'onetime', label: 'One-time bonus', state: result.oneTimeCost },
+    ],
+    total: result.currentYearTotalIncremental,
+    annualizedRecurring: result.annualizedRecurringIncrease,
+  };
+}
 
 export function CompareProposals() {
   const { dataset, engine, epoch, updateOffer, updateDataset } = useAppState();
@@ -27,53 +50,29 @@ export function CompareProposals() {
   const offerB = engine.offers.B;
 
   const stressA = useMemo(() => overtimeStressTest(dataset, 'A'), [dataset]);
-
   const allWarnings = [...new Set([...offerA.warnings, ...offerB.warnings])];
-
   const subject = dataset.employees[0];
 
   return (
-    <div className="stack">
-      <section className="section">
-        <div className="section__head">
-          <h2>What the department costs now</h2>
-          <p className="section__hint">
-            {dataset.department.name} · {offerA.baseline.headcount} employees ·{' '}
-            {offerA.baseline.bonusEligibleCount} marked bonus-eligible · fiscal year{' '}
-            {dataset.fiscalYear.label}
-          </p>
-        </div>
+    <div>
+      <header className="view-intro">
+        <h2>What would each offer cost this fiscal year?</h2>
+        <KeyResult
+          results={[offerA, offerB]}
+          budgets={[engine.budgets.A, engine.budgets.B]}
+        />
+      </header>
 
-        <div className="panel panel--sunken">
-          <dl className="detail-list">
-            <dt>Baseline annual base pay</dt>
-            <dd>
-              <Amount state={offerA.baseline.annualBasePay} />
-            </dd>
-            <dt>Baseline annual overtime</dt>
-            <dd>
-              <Amount state={offerA.baseline.annualOvertimeCost} />
-            </dd>
-            <dt>Baseline annual cost</dt>
-            <dd>
-              <Amount state={offerA.baselineTotalCost} />
-            </dd>
-          </dl>
-        </div>
-      </section>
+      <div className="workbench">
+        <section className="controls" aria-labelledby="inputs-heading">
+          <h3 className="pane-title" id="inputs-heading">
+            Your inputs
+          </h3>
 
-      <section className="section">
-        <div className="section__head">
-          <h2>Workforce budget</h2>
-          <p className="section__hint">
-            Optional. Leave it empty and no remaining-or-shortfall figure is shown; a
-            budget is never assumed.
-          </p>
-        </div>
-        <div className="panel" style={{ maxWidth: '26rem' }}>
           <MoneyField
             key={`budget-${epoch}`}
             label="Adopted workforce budget for this fiscal year"
+            hint="Optional. Leave empty and no remaining-or-shortfall figure is shown."
             value={
               dataset.workforceBudget ?? {
                 state: { kind: 'missing' },
@@ -90,17 +89,7 @@ export function CompareProposals() {
               })
             }
           />
-        </div>
-      </section>
 
-      <section className="section">
-        <div className="section__head">
-          <h2>The two offers</h2>
-          <p className="section__hint">
-            Offer A and Offer B are independent. Editing one never changes the other.
-          </p>
-        </div>
-        <div className="offer-grid">
           {OFFER_IDS.map((id) => (
             <OfferForm
               key={`${id}-${epoch}`}
@@ -109,99 +98,172 @@ export function CompareProposals() {
               onChange={(patch) => updateOffer(id, patch)}
             />
           ))}
-        </div>
-      </section>
+        </section>
 
-      <section className="section" aria-labelledby="results-heading">
-        <div className="section__head">
-          <h2 id="results-heading">What each offer costs</h2>
-        </div>
+        <section className="results" aria-labelledby="results-heading">
+          <h3 className="pane-title" id="results-heading">
+            Results
+          </h3>
 
-        <WarningList title="Things to be aware of" items={allWarnings} />
-        <CompletenessNotice completeness={offerA.completeness} />
-        {offerB.completeness.kind !== 'complete' && offerB.label !== offerA.label ? (
-          <CompletenessNotice completeness={offerB.completeness} />
-        ) : null}
+          <WarningList title="Things to be aware of" items={allWarnings} />
+          <CompletenessNotice completeness={offerA.completeness} />
+          {offerB.completeness.kind !== 'complete' && offerB.label !== offerA.label ? (
+            <CompletenessNotice completeness={offerB.completeness} />
+          ) : null}
 
-        <ResultsTable a={offerA} b={offerB} budgetA={engine.budgets.A} budgetB={engine.budgets.B} />
-
-        <ExclusionsNote exclusions={offerA.exclusions} />
-      </section>
-
-      <section className="section">
-        <Disclosure summary="Assumptions and calculation steps — Offer A">
-          <AssumptionsList assumptions={offerA.assumptions} exclusions={offerA.exclusions} />
-          <h3 style={{ marginTop: '1.5rem' }}>Calculation steps</h3>
-          <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
-            {offerA.prorationNote}
-          </p>
-          <StepsTable steps={offerA.steps} />
-        </Disclosure>
-
-        <Disclosure summary="Assumptions and calculation steps — Offer B">
-          <AssumptionsList assumptions={offerB.assumptions} exclusions={offerB.exclusions} />
-          <h3 style={{ marginTop: '1.5rem' }}>Calculation steps</h3>
-          <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
-            {offerB.prorationNote}
-          </p>
-          <StepsTable steps={offerB.steps} />
-        </Disclosure>
-
-        <Disclosure summary="Overtime hours stress test — Offer A">
-          {stressA.baseHours === undefined ? (
-            <p className="state-note">
-              Overtime is not modeled for Offer A, so there are no hours to vary. Choose a
-              rate basis under Overtime assumptions to use this.
-            </p>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <caption>
-                  Varies one stated assumption — modeled overtime hours per month, from a
-                  base of {stressA.baseHours} hours. Everything else is held constant.
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Scenario</th>
-                    <th scope="col" className="num">
-                      Hours per month
-                    </th>
-                    <th scope="col" className="num">
-                      Overtime increase
-                    </th>
-                    <th scope="col" className="num">
-                      Total current-year increase
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stressA.rows.map((row) => (
-                    <tr key={row.label}>
-                      <th scope="row">{row.label}</th>
-                      <td className="num">{row.monthlyHours}</td>
-                      <td className="num">
-                        <Amount state={row.overtimeIncrement} />
-                      </td>
-                      <td className="num">
-                        <Amount state={row.totalIncremental} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Disclosure>
-
-        <Disclosure summary="Comparison context — other municipalities">
-          <ComparatorTable
-            comparators={dataset.comparators}
-            subjectRole={subject?.role ?? 'the subject position'}
-            subjectGradeStep={subject?.gradeStep ?? 'the subject grade'}
+          <StackedCostChart
+            offers={[toStacked(offerA, 'A'), toStacked(offerB, 'B')]}
           />
-        </Disclosure>
-      </section>
+
+          <ResultsTable
+            a={offerA}
+            b={offerB}
+            budgetA={engine.budgets.A}
+            budgetB={engine.budgets.B}
+          />
+
+          <ExclusionsNote exclusions={offerA.exclusions} />
+
+          <dl className="baseline-strip">
+            <div>
+              <dt>Baseline annual base pay</dt>
+              <dd>
+                <Amount state={offerA.baseline.annualBasePay} />
+              </dd>
+            </div>
+            <div>
+              <dt>Baseline annual overtime</dt>
+              <dd>
+                <Amount state={offerA.baseline.annualOvertimeCost} />
+              </dd>
+            </div>
+            <div>
+              <dt>Baseline annual cost</dt>
+              <dd>
+                <Amount state={offerA.baselineTotalCost} />
+              </dd>
+            </div>
+          </dl>
+          <p className="state-note">
+            Baseline for {offerA.baseline.headcount} employees,{' '}
+            {offerA.baseline.bonusEligibleCount} marked bonus-eligible.
+          </p>
+
+          <div>
+            <Disclosure summary="Assumptions and calculation steps — Offer A">
+              <AssumptionsList assumptions={offerA.assumptions} exclusions={offerA.exclusions} />
+              <h3 style={{ marginTop: '1.5rem' }}>Calculation steps</h3>
+              <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
+                {offerA.prorationNote}
+              </p>
+              <StepsTable steps={offerA.steps} />
+            </Disclosure>
+
+            <Disclosure summary="Assumptions and calculation steps — Offer B">
+              <AssumptionsList assumptions={offerB.assumptions} exclusions={offerB.exclusions} />
+              <h3 style={{ marginTop: '1.5rem' }}>Calculation steps</h3>
+              <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
+                {offerB.prorationNote}
+              </p>
+              <StepsTable steps={offerB.steps} />
+            </Disclosure>
+
+            <Disclosure summary="Overtime hours stress test — Offer A">
+              {stressA.baseHours === undefined ? (
+                <p className="state-note">
+                  Overtime is not modeled for Offer A, so there are no hours to vary. Choose a
+                  rate basis under Overtime assumptions to use this.
+                </p>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <caption>
+                      Varies one stated assumption — modeled overtime hours per month, from a
+                      base of {stressA.baseHours} hours. Everything else is held constant.
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Scenario</th>
+                        <th scope="col" className="num">
+                          Hours per month
+                        </th>
+                        <th scope="col" className="num">
+                          Overtime increase
+                        </th>
+                        <th scope="col" className="num">
+                          Total current-year increase
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stressA.rows.map((row) => (
+                        <tr key={row.label}>
+                          <th scope="row">{row.label}</th>
+                          <td className="num">{row.monthlyHours}</td>
+                          <td className="num">
+                            <Amount state={row.overtimeIncrement} />
+                          </td>
+                          <td className="num">
+                            <Amount state={row.totalIncremental} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Disclosure>
+
+            <Disclosure summary="Comparison context — other municipalities">
+              <ComparatorTable
+                comparators={dataset.comparators}
+                subjectRole={subject?.role ?? 'the subject position'}
+                subjectGradeStep={subject?.gradeStep ?? 'the subject grade'}
+              />
+            </Disclosure>
+          </div>
+        </section>
+      </div>
     </div>
+  );
+}
+
+/** The answer to the view's question, before anything else. */
+function KeyResult({
+  results,
+  budgets,
+}: {
+  results: readonly [OfferResult, OfferResult];
+  budgets: readonly [BudgetPosition | undefined, BudgetPosition | undefined];
+}) {
+  return (
+    <dl className="key-result">
+      {results.map((result, index) => {
+        const budget = budgets[index];
+        return (
+          <div className="key-result__item" key={result.offerId}>
+            <dt>{result.label}</dt>
+            <dd className="key-result__value">
+              <Amount state={result.currentYearTotalIncremental} />{' '}
+              <span className="key-result__unit">increase this fiscal year</span>
+            </dd>
+            <dd className="key-result__sub">
+              <Amount state={result.annualizedRecurringIncrease} /> a year once fully in effect
+            </dd>
+            <dd className="key-result__sub">
+              {budget ? (
+                <span className={budget.isShortfall ? 'amount--negative' : undefined}>
+                  {budget.isShortfall ? 'Workforce budget shortfall' : 'Budget remaining'}{' '}
+                  {formatSignedUSD(budget.remaining)}
+                </span>
+              ) : (
+                'No workforce budget entered'
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -220,8 +282,7 @@ function ResultsTable({
     <div className="table-wrap">
       <table>
         <caption>
-          All amounts are for fiscal year {a.fiscalYear.label} unless the row says
-          otherwise.
+          Fiscal year {a.fiscalYear.label} unless a row says otherwise.
         </caption>
         <thead>
           <tr>

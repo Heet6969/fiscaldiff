@@ -45,13 +45,12 @@ export function DataPanel() {
       <div className="section__head">
         <h2 id="data-heading">Your own data</h2>
         <p className="section__hint">
-          Optional. Everything stays in this browser tab — files are read in the page and
-          are never sent anywhere. There is no document reading, no payroll connection and
-          no external service here.
+          Optional. Files are read in this browser tab and never sent anywhere. Nothing here
+          reads documents or connects to payroll.
         </p>
       </div>
 
-      <div className="panel">
+      <div className="surface">
         <div style={{ maxWidth: '26rem' }}>
           <div className="field">
             <label className="field__label" htmlFor="table-select">

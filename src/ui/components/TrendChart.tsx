@@ -1,170 +1,264 @@
-/**
+﻿/**
  * One line chart, hand-drawn in SVG.
  *
- * Written by hand rather than pulled from a charting library so the markup stays
- * accessible and plain, and so there is no temptation toward decoration. The
- * table underneath carries the same numbers and is the accessible equivalent;
- * the chart is labelled as an image with a text summary.
+ * What it shows depends on the selected measure, and its units follow:
+ *  - the axis title and tick format change with the measure;
+ *  - the monthly budget line appears only on the dollars view, never on hours;
+ *  - months with a "Needs review" flag are marked with an amber diamond, which
+ *    differs in shape and outline from ordinary points and is named in the
+ *    legend and in the data table;
+ *  - months with no recorded value leave a gap rather than being joined across.
  *
- * Months with no value leave a gap. A gap is drawn as a gap, because joining
- * across it would imply a value that was never recorded.
+ * Values arrive from the engine already computed. This component only maps
+ * them to pixels.
  */
+import { niceTicks, useMeasuredWidth } from './charts/chartUtils';
+
 export type ChartPoint = {
   readonly label: string;
   readonly shortLabel: string;
   readonly value: number | undefined;
+  readonly flagged: boolean;
+  readonly budget: number | undefined;
 };
 
-const WIDTH = 760;
-const HEIGHT = 260;
-const PAD_LEFT = 72;
-const PAD_RIGHT = 16;
-const PAD_TOP = 16;
-const PAD_BOTTOM = 44;
+const HEIGHT = 290;
+const PAD_LEFT = 66;
+const PAD_RIGHT = 14;
+const PAD_TOP = 26;
+const PAD_BOTTOM = 36;
 
 export function TrendChart({
   points,
   metricLabel,
-  formatValue,
+  axisTitle,
+  formatTick,
   summary,
+  showBudget,
+  zeroBased,
+  emphasiseZero,
 }: {
   points: readonly ChartPoint[];
   metricLabel: string;
-  formatValue: (value: number) => string;
+  axisTitle: string;
+  formatTick: (value: number) => string;
   summary: string;
+  /** Dollar views only. Never pass true for hours. */
+  showBudget: boolean;
+  zeroBased: boolean;
+  /** Draws the zero line, used where zero means "on budget". */
+  emphasiseZero: boolean;
 }) {
-  const known = points.filter((p) => p.value !== undefined) as { label: string; shortLabel: string; value: number }[];
+  const [ref, width] = useMeasuredWidth(720);
 
+  const known = points.filter((p) => p.value !== undefined);
   if (known.length < 2) {
     return (
       <p className="notice">
-        Not enough comparable data to draw a trend. At least two months with recorded
-        values are needed.
+        Not enough comparable data to draw a trend. At least two months with recorded values
+        are needed.
       </p>
     );
   }
 
-  const values = known.map((p) => p.value);
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const span = rawMax - rawMin;
-  const min = span === 0 ? rawMin - 1 : rawMin - span * 0.1;
-  const max = span === 0 ? rawMax + 1 : rawMax + span * 0.1;
+  const W = Math.max(280, width - 18);
+  const plotW = W - PAD_LEFT - PAD_RIGHT;
+  const plotH = HEIGHT - PAD_TOP - PAD_BOTTOM;
 
-  const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
-  const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const budgetValues = showBudget
+    ? points.map((p) => p.budget).filter((v): v is number => v !== undefined)
+    : [];
+  const budgetVisible = budgetValues.length > 0;
 
-  const x = (index: number) =>
-    points.length === 1
-      ? PAD_LEFT + plotWidth / 2
-      : PAD_LEFT + (index / (points.length - 1)) * plotWidth;
-  const y = (value: number) => PAD_TOP + plotHeight - ((value - min) / (max - min)) * plotHeight;
+  const values = [
+    ...known.map((p) => p.value as number),
+    ...budgetValues,
+    ...(zeroBased || emphasiseZero ? [0] : []),
+  ];
+  const ticks = niceTicks(Math.min(...values), Math.max(...values), 4);
+  const d0 = ticks[0] ?? 0;
+  const d1 = ticks[ticks.length - 1] ?? 1;
 
-  // Build segments, breaking wherever a value is absent.
-  const segments: { index: number; value: number }[][] = [];
-  let current: { index: number; value: number }[] = [];
-  points.forEach((point, index) => {
-    if (point.value === undefined) {
-      if (current.length > 0) segments.push(current);
-      current = [];
-    } else {
-      current.push({ index, value: point.value });
-    }
-  });
-  if (current.length > 0) segments.push(current);
+  const x = (index: number) => PAD_LEFT + (index / (points.length - 1)) * plotW;
+  const y = (value: number) => PAD_TOP + plotH - ((value - d0) / (d1 - d0)) * plotH;
 
-  const ticks = 4;
-  const gridValues = Array.from({ length: ticks + 1 }, (_, i) => min + ((max - min) * i) / ticks);
+  const runsOf = (pick: (p: ChartPoint) => number | undefined) => {
+    const runs: { index: number; value: number }[][] = [];
+    let current: { index: number; value: number }[] = [];
+    points.forEach((point, index) => {
+      const value = pick(point);
+      if (value === undefined) {
+        if (current.length > 0) runs.push(current);
+        current = [];
+      } else {
+        current.push({ index, value });
+      }
+    });
+    if (current.length > 0) runs.push(current);
+    return runs;
+  };
 
-  // Show roughly six month labels so the axis stays readable.
-  const labelStep = Math.max(1, Math.ceil(points.length / 6));
+  const valueRuns = runsOf((p) => p.value);
+  const budgetRuns = budgetVisible ? runsOf((p) => p.budget) : [];
+
+  const maxLabels = Math.max(2, Math.floor(plotW / 62));
+  const labelStep = Math.max(1, Math.ceil(points.length / maxLabels));
+
+  const flaggedCount = points.filter((p) => p.flagged).length;
+  const gapCount = points.filter((p) => p.value === undefined).length;
+  const crossesZero = d0 < 0 && d1 > 0;
 
   return (
     <figure className="chart-figure">
-      <svg
-        className="chart"
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={`Line chart of ${metricLabel}. ${summary}`}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {gridValues.map((value) => (
-          <g key={value}>
-            <line
-              className="chart__gridline"
-              x1={PAD_LEFT}
-              x2={WIDTH - PAD_RIGHT}
-              y1={y(value)}
-              y2={y(value)}
-            />
-            <text className="chart__label" x={PAD_LEFT - 8} y={y(value) + 3} textAnchor="end">
-              {formatValue(value)}
-            </text>
-          </g>
-        ))}
+      <div className="chart-box" ref={ref}>
+        <svg
+          className="chart"
+          width={W}
+          height={HEIGHT}
+          viewBox={`0 0 ${W} ${HEIGHT}`}
+          role="img"
+          aria-label={`Line chart of ${metricLabel}. ${summary}`}
+        >
+          <text className="chart__axis-title" x={PAD_LEFT} y={14}>
+            {axisTitle}
+          </text>
 
-        <line
-          className="chart__axis"
-          x1={PAD_LEFT}
-          x2={PAD_LEFT}
-          y1={PAD_TOP}
-          y2={PAD_TOP + plotHeight}
-        />
-        <line
-          className="chart__axis"
-          x1={PAD_LEFT}
-          x2={WIDTH - PAD_RIGHT}
-          y1={PAD_TOP + plotHeight}
-          y2={PAD_TOP + plotHeight}
-        />
+          {ticks.map((tick) => (
+            <g key={tick}>
+              <line
+                className="chart__gridline"
+                x1={PAD_LEFT}
+                x2={W - PAD_RIGHT}
+                y1={y(tick)}
+                y2={y(tick)}
+              />
+              <text className="chart__label" x={PAD_LEFT - 8} y={y(tick) + 4} textAnchor="end">
+                {formatTick(tick)}
+              </text>
+            </g>
+          ))}
 
-        {segments.map((segment) => (
-          <polyline
-            key={`seg-${segment[0]?.index ?? 0}`}
-            className="chart__line"
-            points={segment.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
+          <line
+            className="chart__axis"
+            x1={PAD_LEFT}
+            x2={PAD_LEFT}
+            y1={PAD_TOP}
+            y2={PAD_TOP + plotH}
           />
-        ))}
-
-        {points.map((point, index) =>
-          point.value === undefined ? (
+          <line
+            className="chart__axis"
+            x1={PAD_LEFT}
+            x2={W - PAD_RIGHT}
+            y1={PAD_TOP + plotH}
+            y2={PAD_TOP + plotH}
+          />
+          {emphasiseZero && crossesZero ? (
             <line
-              key={`gap-${point.label}`}
-              className="chart__gap"
-              x1={x(index)}
-              x2={x(index)}
-              y1={PAD_TOP}
-              y2={PAD_TOP + plotHeight}
+              className="chart__zero"
+              x1={PAD_LEFT}
+              x2={W - PAD_RIGHT}
+              y1={y(0)}
+              y2={y(0)}
             />
-          ) : (
-            <circle
-              key={`pt-${point.label}`}
-              className="chart__point"
-              cx={x(index)}
-              cy={y(point.value)}
-              r={2.5}
-            />
-          ),
-        )}
+          ) : null}
 
-        {points.map((point, index) =>
-          index % labelStep === 0 ? (
-            <text
-              key={`lbl-${point.label}`}
-              className="chart__label"
-              x={x(index)}
-              y={HEIGHT - PAD_BOTTOM + 18}
-              textAnchor="middle"
-            >
-              {point.shortLabel}
-            </text>
-          ) : null,
-        )}
-      </svg>
-      <figcaption className="section__hint">
-        {metricLabel}. {summary} A dashed vertical line marks a month with no recorded
-        value; the line is not joined across it.
+          {points.map((point, index) =>
+            point.flagged ? (
+              <rect
+                key={`band-${point.label}`}
+                className="chart__flag-band"
+                x={x(index) - 7}
+                y={PAD_TOP}
+                width={14}
+                height={plotH}
+              />
+            ) : null,
+          )}
+
+          {budgetRuns.map((run) => (
+            <polyline
+              key={`budget-${run[0]?.index ?? 0}`}
+              className="chart__budget"
+              points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
+            />
+          ))}
+
+          {valueRuns.map((run) => (
+            <polyline
+              key={`line-${run[0]?.index ?? 0}`}
+              className="chart__line"
+              points={run.map((p) => `${x(p.index)},${y(p.value)}`).join(' ')}
+            />
+          ))}
+
+          {points.map((point, index) => {
+            if (point.value === undefined) {
+              return (
+                <line
+                  key={`gap-${point.label}`}
+                  className="chart__gap"
+                  x1={x(index)}
+                  x2={x(index)}
+                  y1={PAD_TOP}
+                  y2={PAD_TOP + plotH}
+                />
+              );
+            }
+            const cx = x(index);
+            const cy = y(point.value);
+            return point.flagged ? (
+              <polygon
+                key={`pt-${point.label}`}
+                className="chart__flag"
+                points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`}
+              >
+                <title>{`${point.label}: Needs review`}</title>
+              </polygon>
+            ) : (
+              <circle key={`pt-${point.label}`} className="chart__point" cx={cx} cy={cy} r={2.75} />
+            );
+          })}
+
+          {points.map((point, index) =>
+            index % labelStep === 0 ? (
+              <text
+                key={`lbl-${point.label}`}
+                className="chart__label"
+                x={x(index)}
+                y={PAD_TOP + plotH + 18}
+                textAnchor="middle"
+              >
+                {point.shortLabel}
+              </text>
+            ) : null,
+          )}
+        </svg>
+      </div>
+
+      <ul className="legend legend--inline" aria-label="Chart legend">
+        <li>
+          <span className="swatch swatch--line" aria-hidden="true" />
+          {metricLabel}
+        </li>
+        {budgetVisible ? (
+          <li>
+            <span className="swatch swatch--budget" aria-hidden="true" />
+            Monthly overtime budget
+          </li>
+        ) : null}
+        {flaggedCount > 0 ? (
+          <li>
+            <span className="swatch swatch--flag" aria-hidden="true" />
+            Month with a Needs review flag ({flaggedCount})
+          </li>
+        ) : null}
+        {gapCount > 0 ? <li>Dotted vertical line: no recorded value ({gapCount})</li> : null}
+      </ul>
+
+      <figcaption className="figure-note">
+        {summary} {zeroBased || emphasiseZero ? 'The vertical axis includes zero.' : 'The vertical axis does not start at zero.'}
       </figcaption>
     </figure>
   );
 }
+

@@ -217,3 +217,46 @@ when a user saves a file, so a likely explanation is that a file edited by the a
 does not count as a user save. That is an inference, not something observed. To close
 this out, save any file under `src/engine/`, `src/money/` or `src/domain/` by hand in
 the editor and note whether the financial suite runs.
+
+### 2026-10-24 — Presentation pass
+
+A focused UI improvement. No engine, money, domain or data code changed
+(`git diff --stat` over `src/engine`, `src/money`, `src/domain` and `src/data` was
+empty), so the financial suite was not re-run.
+
+**Look.** Navy header and headings, warm-white page, white content surfaces, teal for
+primary actions and for the one comparison series in charts, amber reserved for
+"Needs review", red only for shortfalls and invalid inputs. The synthetic-data badge
+was amber and is now a neutral chip, so amber keeps one meaning. Incomplete-result
+warnings are slate rather than amber or red for the same reason.
+
+**Structure.** Each view opens with one plain-English question and the key result:
+what each offer costs, which months deserve a second look, whether the stated figure
+matches. On wide screens inputs sit beside results; on narrow screens they stack, with
+the key result still first. Overtime assumptions, review thresholds and the monthly
+table are collapsed, with the current overtime setting and thresholds stated in the
+summary line. Exclusions, invalid-input errors and incomplete-result notices stay
+visible.
+
+**Charts, all reading existing engine output.** A stacked A/B bar for current-year
+cost by component (zero and negative components are drawn accurately, an excluded
+component is named rather than drawn as zero, an unavailable total says so, and
+annualized impact is labeled separately); the overtime trend with a budget line on the
+dollars view only, flagged months marked with a diamond, and units that follow the
+selected measure; and a stated-versus-calculated bar that is drawn only when a
+comparison was actually made.
+
+**One behavioral change worth knowing.** All three views now stay mounted and the
+inactive ones are hidden, rather than being unmounted on tab switch. That is what lets
+every entry, including a half-typed invalid one, survive switching views. The stated-cost
+view previously lost its entries on a tab switch; it now keeps them and still resets
+with the demonstration data.
+
+**Tests.** Existing assertions were kept and changed only where the UI intentionally
+changed: opening a collapsed section before using it, and scoping one query to its own
+panel. Because every view is now in the DOM, an unscoped text query can find another
+view's collapsed copy; new tests scope queries to the panel they mean. Added
+`tests/e2e/presentation.spec.ts`: chart contents and units, budget line only on
+dollars, gap handling, stated-cost chart absent for "Cannot verify", view-switching
+preservation, layout at both widths, axe with every section expanded, colour roles,
+keyboard focus and print layout.

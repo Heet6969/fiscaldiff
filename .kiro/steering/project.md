@@ -148,7 +148,7 @@ Working prototype. The three views, the shared engine, the synthetic dataset, CS
 import/export and both exports are implemented and tested. Node.js 24.22.1 is
 installed.
 
-As of the last verified run: type check clean, 137 unit tests passing, 56 browser
+As of the last verified run: type check clean, 137 unit tests passing, 81 browser
 tests passing, production build succeeding. The display name is now CivicVariance;
 FiscalDiff was the working name and remains the repository and package name. The financial-test hook exists at
 `.kiro/hooks/financial-tests-on-engine-change.json`, but **its execution on save has

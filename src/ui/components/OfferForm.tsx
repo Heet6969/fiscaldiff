@@ -3,12 +3,13 @@
  *
  * The overtime basis is an explicit three-way choice, because "no overtime
  * modeled" is a real and disclosed answer rather than an empty field that
- * quietly means zero.
+ * quietly means zero. The choice is collapsed to keep the form short, but its
+ * current setting is always visible in the summary line.
  */
 import type { Offer, OfferId, OvertimeModel } from '../../domain/dataset';
 import type { Input, ValueState } from '../../domain/types';
 import { known } from '../../domain/types';
-import { fromDollars, type Money } from '../../money/money';
+import { formatUSD, fromDollars, type Money } from '../../money/money';
 import { OVERTIME_BASIS_DISCLAIMER } from '../../engine/config';
 import { DateField, MoneyField, NumberField } from './Fields';
 
@@ -26,6 +27,23 @@ function monthlyHoursOf(model: OvertimeModel): Input<number> {
   return model.kind === 'modeled'
     ? model.monthlyHours
     : known(420, 'user-assumption', { sourceLabel: 'Entered assumption' });
+}
+
+/** One plain line describing the current overtime setting. */
+function overtimeSummary(model: OvertimeModel): string {
+  if (model.kind === 'excluded') return 'Not modeled — reported as excluded';
+
+  const hours =
+    model.monthlyHours.state.kind === 'known'
+      ? `${model.monthlyHours.state.value} hours a month`
+      : 'hours incomplete';
+
+  if (model.rate.kind === 'derived') {
+    const m = model.rate.multiplier.state;
+    return `Rate derived from base pay${m.kind === 'known' ? ` × ${m.value}` : ' (multiplier incomplete)'}, ${hours}`;
+  }
+  const r = model.rate.confirmedRate.state;
+  return `Confirmed rate${r.kind === 'known' ? ` ${formatUSD(r.value)}` : ' (incomplete)'}, held flat, ${hours}`;
 }
 
 export function OfferForm({
@@ -75,124 +93,136 @@ export function OfferForm({
   const radioName = `overtime-basis-${offerId}`;
 
   return (
-    <fieldset className="panel">
+    <fieldset>
       <legend>{offer.label}</legend>
 
-      <NumberField
-        label="Base-pay raise"
-        suffix="percent"
-        hint="Leave empty if this offer has no base-pay raise."
-        value={offer.basePayRaisePercent}
-        max={100}
-        onCommit={(state: ValueState<number>) =>
-          onChange({ basePayRaisePercent: { ...offer.basePayRaisePercent, state } })
-        }
-      />
+      <div className="field-pair">
+        <NumberField
+          label="Base-pay raise"
+          suffix="percent"
+          value={offer.basePayRaisePercent}
+          max={100}
+          onCommit={(state: ValueState<number>) =>
+            onChange({ basePayRaisePercent: { ...offer.basePayRaisePercent, state } })
+          }
+        />
+        <DateField
+          label="Raise effective date"
+          value={offer.raiseEffectiveDate}
+          onCommit={(state) =>
+            onChange({ raiseEffectiveDate: { ...offer.raiseEffectiveDate, state } })
+          }
+        />
+      </div>
 
-      <DateField
-        label="Raise effective date"
-        hint="A mid-month date is prorated by calendar days, not rounded to a month boundary."
-        value={offer.raiseEffectiveDate}
-        onCommit={(state) => onChange({ raiseEffectiveDate: { ...offer.raiseEffectiveDate, state } })}
-      />
+      <div className="field-pair">
+        <MoneyField
+          label="One-time bonus per eligible employee"
+          value={offer.oneTimeBonusPerEmployee}
+          onCommit={(state) =>
+            onChange({ oneTimeBonusPerEmployee: { ...offer.oneTimeBonusPerEmployee, state } })
+          }
+        />
+        <DateField
+          label="Bonus payment date"
+          value={offer.bonusPaymentDate}
+          onCommit={(state) => onChange({ bonusPaymentDate: { ...offer.bonusPaymentDate, state } })}
+        />
+      </div>
 
-      <MoneyField
-        label="One-time bonus per eligible employee"
-        hint="Paid once. Never counted in the recurring figure."
-        value={offer.oneTimeBonusPerEmployee}
-        onCommit={(state) =>
-          onChange({ oneTimeBonusPerEmployee: { ...offer.oneTimeBonusPerEmployee, state } })
-        }
-      />
+      <details className="inline-details">
+        <summary>
+          Overtime assumptions
+          <span className="summary-detail">{overtimeSummary(offer.overtime)}</span>
+        </summary>
+        <fieldset>
+          <legend className="visually-hidden">Overtime rate basis and hours</legend>
+          <p className="field__hint" style={{ marginBottom: '0.75rem' }}>
+            {OVERTIME_BASIS_DISCLAIMER}
+          </p>
 
-      <DateField
-        label="Bonus payment date"
-        hint="A bonus is charged to a year only if it is paid inside that year."
-        value={offer.bonusPaymentDate}
-        onCommit={(state) => onChange({ bonusPaymentDate: { ...offer.bonusPaymentDate, state } })}
-      />
-
-      <fieldset style={{ marginTop: '1rem' }}>
-        <legend>Overtime assumptions</legend>
-        <p className="field__hint" style={{ marginBottom: '0.75rem' }}>
-          {OVERTIME_BASIS_DISCLAIMER}
-        </p>
-
-        <div className="radio-row" role="radiogroup" aria-label={`Overtime rate basis for ${offer.label}`}>
-          <div className="radio-option">
-            <input
-              type="radio"
-              id={`${radioName}-excluded`}
-              name={radioName}
-              checked={basis === 'excluded'}
-              onChange={() => setBasis('excluded')}
-            />
-            <label htmlFor={`${radioName}-excluded`}>
-              Do not model overtime
-              <span className="field__hint"> — reported as excluded, not as zero</span>
-            </label>
+          <div
+            className="radio-row"
+            role="radiogroup"
+            aria-label={`Overtime rate basis for ${offer.label}`}
+          >
+            <div className="radio-option">
+              <input
+                type="radio"
+                id={`${radioName}-excluded`}
+                name={radioName}
+                checked={basis === 'excluded'}
+                onChange={() => setBasis('excluded')}
+              />
+              <label htmlFor={`${radioName}-excluded`}>
+                Do not model overtime
+                <span className="field__hint"> — reported as excluded, not as zero</span>
+              </label>
+            </div>
+            <div className="radio-option">
+              <input
+                type="radio"
+                id={`${radioName}-derived`}
+                name={radioName}
+                checked={basis === 'derived'}
+                onChange={() => setBasis('derived')}
+              />
+              <label htmlFor={`${radioName}-derived`}>
+                Derive the rate from hourly base pay
+                <span className="field__hint"> — rises with the raise, from its effective date</span>
+              </label>
+            </div>
+            <div className="radio-option">
+              <input
+                type="radio"
+                id={`${radioName}-independent`}
+                name={radioName}
+                checked={basis === 'independent'}
+                onChange={() => setBasis('independent')}
+              />
+              <label htmlFor={`${radioName}-independent`}>
+                Use a separately confirmed rate
+                <span className="field__hint"> — held flat; not escalated by the raise</span>
+              </label>
+            </div>
           </div>
-          <div className="radio-option">
-            <input
-              type="radio"
-              id={`${radioName}-derived`}
-              name={radioName}
-              checked={basis === 'derived'}
-              onChange={() => setBasis('derived')}
-            />
-            <label htmlFor={`${radioName}-derived`}>
-              Derive the rate from hourly base pay
-              <span className="field__hint"> — rises with the raise, from its effective date</span>
-            </label>
-          </div>
-          <div className="radio-option">
-            <input
-              type="radio"
-              id={`${radioName}-independent`}
-              name={radioName}
-              checked={basis === 'independent'}
-              onChange={() => setBasis('independent')}
-            />
-            <label htmlFor={`${radioName}-independent`}>
-              Use a separately confirmed rate
-              <span className="field__hint"> — held flat; not escalated by the raise</span>
-            </label>
-          </div>
-        </div>
 
-        {basis !== 'excluded' ? (
-          <div style={{ marginTop: '1rem' }}>
-            <NumberField
-              label="Modeled overtime hours per month"
-              suffix="hours, department-wide"
-              value={monthlyHours}
-              onCommit={(state) => patchOvertime({ monthlyHours: { ...monthlyHours, state } })}
-            />
-            {basis === 'derived' ? (
+          {basis !== 'excluded' ? (
+            <div style={{ marginTop: '1rem' }}>
               <NumberField
-                label="Overtime multiplier"
-                hint="Applied to mean hourly base pay of overtime-eligible staff."
-                value={multiplier}
-                min={0}
-                onCommit={(state) =>
-                  patchOvertime({ rate: { kind: 'derived', multiplier: { ...multiplier, state } } })
-                }
+                label="Modeled overtime hours per month"
+                suffix="hours, department-wide"
+                value={monthlyHours}
+                onCommit={(state) => patchOvertime({ monthlyHours: { ...monthlyHours, state } })}
               />
-            ) : (
-              <MoneyField
-                label="Confirmed overtime hourly rate"
-                hint="Entered as confirmed, so the raise does not change it."
-                value={confirmedRate}
-                onCommit={(state) =>
-                  patchOvertime({
-                    rate: { kind: 'independent', confirmedRate: { ...confirmedRate, state } },
-                  })
-                }
-              />
-            )}
-          </div>
-        ) : null}
-      </fieldset>
+              {basis === 'derived' ? (
+                <NumberField
+                  label="Overtime multiplier"
+                  hint="Applied to mean hourly base pay of overtime-eligible staff."
+                  value={multiplier}
+                  min={0}
+                  onCommit={(state) =>
+                    patchOvertime({
+                      rate: { kind: 'derived', multiplier: { ...multiplier, state } },
+                    })
+                  }
+                />
+              ) : (
+                <MoneyField
+                  label="Confirmed overtime hourly rate"
+                  hint="Entered as confirmed, so the raise does not change it."
+                  value={confirmedRate}
+                  onCommit={(state) =>
+                    patchOvertime({
+                      rate: { kind: 'independent', confirmedRate: { ...confirmedRate, state } },
+                    })
+                  }
+                />
+              )}
+            </div>
+          ) : null}
+        </fieldset>
+      </details>
     </fieldset>
   );
 }

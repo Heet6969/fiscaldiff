@@ -122,25 +122,34 @@ function Shell() {
           ))}
         </div>
 
-        <div
-          role="tabpanel"
-          id={`panel-${active}`}
-          aria-labelledby={`tab-${active}`}
-          tabIndex={0}
-        >
-          {active === 'compare' ? <CompareProposals /> : null}
-          {active === 'overtime' ? <ReviewOvertime /> : null}
-          {active === 'stated' ? <CheckStatedCost /> : null}
-        </div>
+        {/*
+          All three views stay mounted and the inactive ones are hidden. That
+          keeps every entry, including a half-typed or invalid one, exactly as
+          the user left it when they switch views.
+        */}
+        {TABS.map((tab) => (
+          <div
+            key={tab.id}
+            role="tabpanel"
+            id={`panel-${tab.id}`}
+            aria-labelledby={`tab-${tab.id}`}
+            tabIndex={0}
+            hidden={active !== tab.id}
+          >
+            {tab.id === 'compare' ? <CompareProposals /> : null}
+            {tab.id === 'overtime' ? <ReviewOvertime /> : null}
+            {tab.id === 'stated' ? <CheckStatedCost /> : null}
+          </div>
+        ))}
 
-        <hr style={{ margin: '2.5rem 0', border: 0, borderTop: '1px solid var(--border)' }} />
+        <hr className="rule" />
 
         <section className="section" aria-labelledby="export-heading">
           <div className="section__head">
             <h2 id="export-heading">Take it away</h2>
             <p className="section__hint">
-              Both outputs carry the synthetic-data label, the fiscal period, the
-              assumptions applied, the excluded cost categories and the date.
+              Both outputs carry the synthetic-data label, fiscal period, assumptions,
+              exclusions and date.
             </p>
           </div>
           <div className="button-row">
@@ -159,12 +168,11 @@ function Shell() {
 
         <DataPanel />
 
-        <footer>
+        <footer className="footer-note">
           <p className="state-note">
-            CivicVariance is a prototype. Built at Sundai — Hackachusetts 2026. It runs entirely in this
-            browser tab: no backend, no database, no payroll connection and no AI service at
-            run time. All data shown is fictional. Employer taxes, pension and benefits are
-            not calculated.
+            CivicVariance is a prototype. Built at Sundai — Hackachusetts 2026. It runs entirely
+            in this browser tab: no backend, database, payroll connection or AI service. All
+            data shown is fictional. Employer taxes, pension and benefits are not calculated.
           </p>
         </footer>
       </main>

@@ -9,20 +9,77 @@ import { useAppState } from '../state/AppState';
 import { Amount, Disclosure, NotEnoughData } from '../components/Common';
 import { NumberField } from '../components/Fields';
 import { TrendChart, type ChartPoint } from '../components/TrendChart';
-import { formatSignedUSD, formatUSD, toDecimalDollars } from '../../money/money';
+import { formatSignedUSD, formatUSD } from '../../money/money';
 import { formatYearMonthLong } from '../../engine/dates';
 import { REVIEW_THRESHOLD_DISCLAIMER } from '../../engine/config';
 import type { MonthlyOvertimeRow } from '../../engine/overtime';
 import type { Flag } from '../../engine/flags';
+import { centsToNumber, groupedNumber } from '../components/charts/chartUtils';
 
 type Metric = 'hours' | 'dollars' | 'effective' | 'variance';
 
-const METRIC_OPTIONS: readonly { value: Metric; label: string }[] = [
-  { value: 'hours', label: 'Overtime hours per month' },
-  { value: 'dollars', label: 'Overtime dollars per month' },
-  { value: 'effective', label: 'Effective overtime hourly cost' },
-  { value: 'variance', label: 'Budget variance per month' },
-];
+type MetricConfig = {
+  readonly label: string;
+  readonly axisTitle: string;
+  readonly zeroBased: boolean;
+  readonly emphasiseZero: boolean;
+  readonly showBudget: boolean;
+  readonly formatTick: (value: number) => string;
+  readonly formatValue: (value: number) => string;
+};
+
+function dollars(value: number, decimals: number): string {
+  const text = Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${value < 0 ? '-' : ''}$${text}`;
+}
+
+/**
+ * Units follow the selected measure. Only the dollars view carries a budget
+ * line: a dollar budget has no meaning on an hours axis.
+ */
+const METRICS: Record<Metric, MetricConfig> = {
+  hours: {
+    label: 'Overtime hours per month',
+    axisTitle: 'Hours per month',
+    zeroBased: true,
+    emphasiseZero: false,
+    showBudget: false,
+    formatTick: (v) => groupedNumber(v),
+    formatValue: (v) => `${groupedNumber(Math.round(v * 10) / 10)} hours`,
+  },
+  dollars: {
+    label: 'Overtime dollars per month',
+    axisTitle: 'Dollars per month',
+    zeroBased: true,
+    emphasiseZero: false,
+    showBudget: true,
+    formatTick: (v) => dollars(v, 0),
+    formatValue: (v) => dollars(v, 2),
+  },
+  effective: {
+    label: 'Effective overtime hourly cost',
+    axisTitle: 'Dollars per overtime hour',
+    zeroBased: false,
+    emphasiseZero: false,
+    showBudget: false,
+    formatTick: (v) => dollars(v, 2),
+    formatValue: (v) => dollars(v, 2),
+  },
+  variance: {
+    label: 'Budget variance per month',
+    axisTitle: 'Dollars above (+) or below (−) the monthly budget',
+    zeroBased: false,
+    emphasiseZero: true,
+    showBudget: false,
+    formatTick: (v) => (v > 0 ? `+${dollars(v, 0)}` : dollars(v, 0)),
+    formatValue: (v) => (v > 0 ? `+${dollars(v, 2)}` : dollars(v, 2)),
+  },
+};
+
+const METRIC_ORDER: readonly Metric[] = ['hours', 'dollars', 'effective', 'variance'];
 
 export function ReviewOvertime() {
   const { engine, thresholds, setThresholds, epoch } = useAppState();
@@ -31,6 +88,13 @@ export function ReviewOvertime() {
   const rows = engine.overtimeRows;
   const totals = engine.overtimeTotals;
   const { flags, notAssessed } = engine.flags;
+  const config = METRICS[metric];
+
+  // The month a flag is about is the last one it names.
+  const flaggedMonths = useMemo(
+    () => new Set(flags.map((f) => f.months[f.months.length - 1]).filter((m): m is string => !!m)),
+    [flags],
+  );
 
   const points = useMemo<ChartPoint[]>(
     () =>
@@ -38,222 +102,272 @@ export function ReviewOvertime() {
         label: formatYearMonthLong(row.month),
         shortLabel: row.month,
         value: metricValue(row, metric),
+        flagged: flaggedMonths.has(row.month),
+        budget: row.budget && row.budget.kind === 'known' ? centsToNumber(row.budget.value) : undefined,
       })),
-    [rows, metric],
+    [rows, metric, flaggedMonths],
   );
 
-  const metricLabel = METRIC_OPTIONS.find((o) => o.value === metric)?.label ?? 'Overtime';
   const knownCount = points.filter((p) => p.value !== undefined).length;
+  const monthCount = flaggedMonths.size;
 
   return (
-    <div className="stack">
-      <section className="section">
-        <div className="section__head">
-          <h2>Overtime history</h2>
-          <p className="section__hint">
-            {rows.length} month{rows.length === 1 ? '' : 's'} of records, {knownCount} with a
-            value for this measure. Figures describe what was recorded. They are not a
-            forecast.
-          </p>
-        </div>
+    <div>
+      <header className="view-intro">
+        <h2>Which months deserve a second look?</h2>
+        <p className="key-result-line">
+          {flags.length === 0 ? (
+            <strong>No month met the review thresholds.</strong>
+          ) : (
+            <>
+              <strong>
+                {flags.length} pattern{flags.length === 1 ? '' : 's'} in {monthCount} month
+                {monthCount === 1 ? '' : 's'}
+              </strong>{' '}
+              of {rows.length} recorded {flags.length === 1 ? 'needs' : 'need'} a person to look.
+              The tool does not say why.
+            </>
+          )}
+        </p>
+      </header>
 
-        <div className="panel">
-          <div style={{ maxWidth: '24rem', marginBottom: '1rem' }}>
-            <div className="field">
-              <label className="field__label" htmlFor="metric-select">
-                Show
-              </label>
-              <select
-                id="metric-select"
-                value={metric}
-                onChange={(e) => setMetric(e.target.value as Metric)}
-              >
-                {METRIC_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <div className="workbench">
+        <section className="controls" aria-labelledby="overtime-inputs-heading">
+          <h3 className="pane-title" id="overtime-inputs-heading">
+            Your inputs
+          </h3>
+
+          <div className="field">
+            <label className="field__label" htmlFor="metric-select">
+              Show
+            </label>
+            <select
+              id="metric-select"
+              value={metric}
+              onChange={(e) => setMetric(e.target.value as Metric)}
+            >
+              {METRIC_ORDER.map((key) => (
+                <option key={key} value={key}>
+                  {METRICS[key].label}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <details className="inline-details">
+            <summary>
+              Review thresholds
+              <span className="summary-detail">
+                Hours +{thresholds.hoursIncreasePercent}%, hourly cost ±
+                {thresholds.effectiveHourlyCostChangePercent}% — demonstration values
+              </span>
+            </summary>
+            <div style={{ padding: '0.75rem' }}>
+              <p className="field__hint" style={{ marginBottom: '0.75rem' }}>
+                {REVIEW_THRESHOLD_DISCLAIMER}
+              </p>
+              <NumberField
+                key={`hours-threshold-${epoch}`}
+                label="Flag an hours increase of at least"
+                suffix="percent"
+                hint="Compared against the immediately preceding complete month."
+                value={{
+                  state: { kind: 'known', value: thresholds.hoursIncreasePercent },
+                  provenance: 'user-assumption',
+                }}
+                onCommit={(state) => {
+                  if (state.kind === 'known') {
+                    setThresholds({ ...thresholds, hoursIncreasePercent: state.value });
+                  }
+                }}
+              />
+              <NumberField
+                key={`cost-threshold-${epoch}`}
+                label="Flag an effective hourly cost change of at least"
+                suffix="percent"
+                hint="In either direction, against the preceding complete month."
+                value={{
+                  state: { kind: 'known', value: thresholds.effectiveHourlyCostChangePercent },
+                  provenance: 'user-assumption',
+                }}
+                onCommit={(state) => {
+                  if (state.kind === 'known') {
+                    setThresholds({ ...thresholds, effectiveHourlyCostChangePercent: state.value });
+                  }
+                }}
+              />
+              <div className="checkbox-option">
+                <input
+                  type="checkbox"
+                  id="flag-budget"
+                  checked={thresholds.flagBudgetOverage}
+                  onChange={(e) =>
+                    setThresholds({ ...thresholds, flagBudgetOverage: e.target.checked })
+                  }
+                />
+                <label htmlFor="flag-budget">
+                  Flag months whose spending exceeds the entered budget
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <p className="state-note">
+            Thresholds are demonstration values, not an industry standard or an anomaly detector.
+          </p>
+        </section>
+
+        <section className="results" aria-labelledby="overtime-results-heading">
+          <h3 className="pane-title" id="overtime-results-heading">
+            Overtime history
+          </h3>
 
           <TrendChart
             points={points}
-            metricLabel={metricLabel}
-            formatValue={(value) => formatMetric(value, metric, true)}
-            summary={summarise(points, metric)}
+            metricLabel={config.label}
+            axisTitle={config.axisTitle}
+            formatTick={config.formatTick}
+            summary={summarise(points, config)}
+            showBudget={config.showBudget}
+            zeroBased={config.zeroBased}
+            emphasiseZero={config.emphasiseZero}
           />
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section__head">
-          <h2>Needs review</h2>
-          <p className="section__hint">{REVIEW_THRESHOLD_DISCLAIMER}</p>
-        </div>
-
-        <div className="panel panel--sunken" style={{ marginBottom: '1rem' }}>
-          <h3 style={{ marginBottom: '0.75rem' }}>Demonstration thresholds</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))', gap: '1rem' }}>
-            <NumberField
-              key={`hours-threshold-${epoch}`}
-              label="Flag an hours increase of at least"
-              suffix="percent"
-              hint="Compared against the immediately preceding complete month."
-              value={{ state: { kind: 'known', value: thresholds.hoursIncreasePercent }, provenance: 'user-assumption' }}
-              onCommit={(state) => {
-                if (state.kind === 'known') {
-                  setThresholds({ ...thresholds, hoursIncreasePercent: state.value });
-                }
-              }}
-            />
-            <NumberField
-              key={`cost-threshold-${epoch}`}
-              label="Flag an effective hourly cost change of at least"
-              suffix="percent"
-              hint="In either direction, against the preceding complete month."
-              value={{
-                state: { kind: 'known', value: thresholds.effectiveHourlyCostChangePercent },
-                provenance: 'user-assumption',
-              }}
-              onCommit={(state) => {
-                if (state.kind === 'known') {
-                  setThresholds({ ...thresholds, effectiveHourlyCostChangePercent: state.value });
-                }
-              }}
-            />
-          </div>
-          <div className="checkbox-option" style={{ marginTop: '0.5rem' }}>
-            <input
-              type="checkbox"
-              id="flag-budget"
-              checked={thresholds.flagBudgetOverage}
-              onChange={(e) => setThresholds({ ...thresholds, flagBudgetOverage: e.target.checked })}
-            />
-            <label htmlFor="flag-budget">Flag months whose spending exceeds the entered budget</label>
-          </div>
-        </div>
-
-        {flags.length === 0 ? (
-          <p className="notice">
-            No month met the thresholds above. That is a statement about these thresholds
-            and these records, nothing more.
+          <p className="state-note">
+            {rows.length} months recorded, {knownCount} with a value for this measure.
+            Descriptive only, not a forecast.
           </p>
-        ) : (
-          <ul className="flag-list">
-            {flags.map((flag) => (
-              <FlagCard key={flag.id} flag={flag} />
-            ))}
-          </ul>
-        )}
 
-        {notAssessed.length > 0 ? (
-          <Disclosure summary={`Months not assessed (${notAssessed.length})`}>
-            <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
-              These months were not compared. A month with no record is not a month with
-              zero overtime.
+          <h3 className="pane-title" style={{ marginTop: '1.5rem' }}>
+            Needs review
+          </h3>
+
+          {flags.length === 0 ? (
+            <p className="notice">
+              No month met the thresholds. That is a statement about these thresholds and these
+              records, nothing more.
             </p>
-            <ul className="stack-tight">
-              {notAssessed.map((item, index) => (
-                <li key={`${item.month}-${index}`}>
-                  <strong>{formatYearMonthLong(item.month)}</strong> — {item.reason}
-                </li>
+          ) : (
+            <ul className="flag-list">
+              {flags.map((flag) => (
+                <FlagCard key={flag.id} flag={flag} />
               ))}
             </ul>
-          </Disclosure>
-        ) : null}
-      </section>
+          )}
 
-      <section className="section">
-        <div className="section__head">
-          <h2>Monthly records</h2>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <caption>
-              The same figures as the chart above. Effective hourly cost is dollars divided
-              by hours, shown only where both are recorded and hours are above zero.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Month</th>
-                <th scope="col" className="num">
-                  Hours
-                </th>
-                <th scope="col" className="num">
-                  Dollars
-                </th>
-                <th scope="col" className="num">
-                  Effective hourly cost
-                </th>
-                <th scope="col" className="num">
-                  Budget variance
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.month}>
-                  <th scope="row">{formatYearMonthLong(row.month)}</th>
-                  <td className="num">
-                    {row.hours.kind === 'known' ? (
-                      formatHoursValue(row.hours.value)
-                    ) : (
-                      <span className="state-note">
-                        {row.hours.kind === 'missing' ? 'Missing' : 'Unknown'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="num">
-                    <Amount state={row.dollars} />
-                  </td>
-                  <td className="num">
-                    {row.effectiveHourlyCost.kind === 'computed' ? (
-                      formatUSD(row.effectiveHourlyCost.amount)
-                    ) : (
-                      <NotEnoughData reason={row.effectiveHourlyCost.reason} />
-                    )}
-                  </td>
-                  <td className="num">
-                    {row.budgetVariance.kind === 'computed' ? (
-                      <span className={row.budgetVariance.overBudget ? 'amount--negative' : undefined}>
-                        {formatSignedUSD(row.budgetVariance.variance)}
-                      </span>
-                    ) : row.budgetVariance.kind === 'no-budget' ? (
-                      <span className="state-note">No budget</span>
-                    ) : (
-                      <NotEnoughData reason={row.budgetVariance.reason} />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="row--total">
-                <th scope="row">Total across {totals.monthsCounted} months</th>
-                <td className="num">
-                  {totals.totalHours.kind === 'known' ? (
-                    formatHoursValue(totals.totalHours.value)
-                  ) : (
-                    <NotEnoughData reason={`${totals.monthsIncomplete} incomplete month(s)`} />
-                  )}
-                </td>
-                <td className="num">
-                  <Amount state={totals.totalDollars} />
-                </td>
-                <td className="num">
-                  {totals.overallEffectiveHourlyCost.kind === 'computed' ? (
-                    formatUSD(totals.overallEffectiveHourlyCost.amount)
-                  ) : (
-                    <NotEnoughData reason={totals.overallEffectiveHourlyCost.reason} />
-                  )}
-                </td>
-                <td className="num">—</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
+          {notAssessed.length > 0 ? (
+            <Disclosure summary={`Months not assessed (${notAssessed.length})`}>
+              <p className="section__hint" style={{ marginBottom: '0.75rem' }}>
+                These months were not compared. A month with no record is not a month with zero
+                overtime.
+              </p>
+              <ul className="stack-tight">
+                {notAssessed.map((item, index) => (
+                  <li key={`${item.month}-${index}`}>
+                    <strong>{formatYearMonthLong(item.month)}</strong> — {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          ) : null}
+
+          <Disclosure summary="Monthly records — table of the chart data">
+            <div className="table-wrap">
+              <table>
+                <caption>
+                  Effective hourly cost is dollars divided by hours, shown only where both are
+                  recorded and hours are above zero.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Month</th>
+                    <th scope="col" className="num">
+                      Hours
+                    </th>
+                    <th scope="col" className="num">
+                      Dollars
+                    </th>
+                    <th scope="col" className="num">
+                      Effective hourly cost
+                    </th>
+                    <th scope="col" className="num">
+                      Budget variance
+                    </th>
+                    <th scope="col">Review</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.month}>
+                      <th scope="row">{formatYearMonthLong(row.month)}</th>
+                      <td className="num">
+                        {row.hours.kind === 'known' ? (
+                          groupedNumber(Math.round(row.hours.value * 10) / 10)
+                        ) : (
+                          <span className="state-note">
+                            {row.hours.kind === 'missing' ? 'Missing' : 'Unknown'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num">
+                        <Amount state={row.dollars} />
+                      </td>
+                      <td className="num">
+                        {row.effectiveHourlyCost.kind === 'computed' ? (
+                          formatUSD(row.effectiveHourlyCost.amount)
+                        ) : (
+                          <NotEnoughData reason={row.effectiveHourlyCost.reason} />
+                        )}
+                      </td>
+                      <td className="num">
+                        {row.budgetVariance.kind === 'computed' ? (
+                          <span
+                            className={row.budgetVariance.overBudget ? 'amount--negative' : undefined}
+                          >
+                            {formatSignedUSD(row.budgetVariance.variance)}
+                          </span>
+                        ) : row.budgetVariance.kind === 'no-budget' ? (
+                          <span className="state-note">No budget</span>
+                        ) : (
+                          <NotEnoughData reason={row.budgetVariance.reason} />
+                        )}
+                      </td>
+                      <td>
+                        {flaggedMonths.has(row.month) ? (
+                          <span className="review-mark">Needs review</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="row--total">
+                    <th scope="row">Total across {totals.monthsCounted} months</th>
+                    <td className="num">
+                      {totals.totalHours.kind === 'known' ? (
+                        groupedNumber(Math.round(totals.totalHours.value * 10) / 10)
+                      ) : (
+                        <NotEnoughData reason={`${totals.monthsIncomplete} incomplete month(s)`} />
+                      )}
+                    </td>
+                    <td className="num">
+                      <Amount state={totals.totalDollars} />
+                    </td>
+                    <td className="num">
+                      {totals.overallEffectiveHourlyCost.kind === 'computed' ? (
+                        formatUSD(totals.overallEffectiveHourlyCost.amount)
+                      ) : (
+                        <NotEnoughData reason={totals.overallEffectiveHourlyCost.reason} />
+                      )}
+                    </td>
+                    <td className="num">—</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </Disclosure>
+        </section>
+      </div>
     </div>
   );
 }
@@ -287,41 +401,25 @@ function metricValue(row: MonthlyOvertimeRow, metric: Metric): number | undefine
     case 'hours':
       return row.hours.kind === 'known' ? row.hours.value : undefined;
     case 'dollars':
-      return row.dollars.kind === 'known' ? toDecimalDollars(row.dollars.value).toNumber() : undefined;
+      return row.dollars.kind === 'known' ? centsToNumber(row.dollars.value) : undefined;
     case 'effective':
       return row.effectiveHourlyCost.kind === 'computed'
-        ? toDecimalDollars(row.effectiveHourlyCost.amount).toNumber()
+        ? centsToNumber(row.effectiveHourlyCost.amount)
         : undefined;
     case 'variance':
       return row.budgetVariance.kind === 'computed'
-        ? toDecimalDollars(row.budgetVariance.variance).toNumber()
+        ? centsToNumber(row.budgetVariance.variance)
         : undefined;
   }
 }
 
-function formatMetric(value: number, metric: Metric, compact = false): string {
-  if (metric === 'hours') return compact ? String(Math.round(value)) : formatHoursValue(value);
-  const rounded = Math.round(value);
-  if (compact) {
-    const abs = Math.abs(rounded);
-    const sign = rounded < 0 ? '-' : '';
-    if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(abs >= 10000 ? 0 : 1)}k`;
-    return `${sign}$${abs}`;
-  }
-  return `$${rounded.toLocaleString('en-US')}`;
-}
+function summarise(points: readonly ChartPoint[], config: MetricConfig): string {
+  const known = points.filter((p): p is ChartPoint & { value: number } => p.value !== undefined);
+  const first = known[0];
+  if (!first) return 'No values are recorded for this measure.';
 
-function formatHoursValue(hours: number): string {
-  return hours.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-}
-
-function summarise(points: readonly ChartPoint[], metric: Metric): string {
-  const known = points.filter((p) => p.value !== undefined) as { label: string; value: number }[];
-  if (known.length === 0) return 'No values are recorded for this measure.';
-
-  let lowest = known[0];
-  let highest = known[0];
-  if (!lowest || !highest) return 'No values are recorded for this measure.';
+  let lowest = first;
+  let highest = first;
   for (const point of known) {
     if (point.value < lowest.value) lowest = point;
     if (point.value > highest.value) highest = point;
@@ -331,7 +429,7 @@ function summarise(points: readonly ChartPoint[], metric: Metric): string {
   const gapNote = gaps > 0 ? ` ${gaps} month${gaps === 1 ? '' : 's'} have no recorded value.` : '';
 
   return (
-    `Lowest ${formatMetric(lowest.value, metric)} in ${lowest.label}, ` +
-    `highest ${formatMetric(highest.value, metric)} in ${highest.label}.${gapNote}`
+    `Lowest ${config.formatValue(lowest.value)} in ${lowest.label}, ` +
+    `highest ${config.formatValue(highest.value)} in ${highest.label}.${gapNote}`
   );
 }

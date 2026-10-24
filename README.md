@@ -14,9 +14,10 @@ Built at Sundai — Hackachusetts 2026.
 
 Working prototype. Runs entirely in the browser on fictional data.
 
-Verified on 2026-10-24: type check clean, 137 unit tests passing, 56 browser tests
+Verified on 2026-10-24: type check clean, 137 unit tests passing, 81 browser tests
 passing, production build succeeding. (The unit tests were last run before the display
-rename, which did not touch engine code; the browser suite was re-run after it.) See
+rename and the presentation pass, neither of which touched engine, money, domain or data
+code; the browser suite was re-run after both.) See
 [`docs/kiro-usage.md`](docs/kiro-usage.md) for the observed output of each command
 and for what has **not** been verified.
 

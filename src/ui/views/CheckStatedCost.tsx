@@ -3,16 +3,24 @@
  *
  * The scope is settled before any arithmetic happens, so a claim about a
  * different period or a different set of components comes back as "Cannot
- * verify" rather than as a difference that looks like a finding.
+ * verify" rather than as a difference that looks like a finding. The chart is
+ * drawn only when a comparison was actually made.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppState } from '../state/AppState';
 import { Amount, Disclosure } from '../components/Common';
 import { DateField, MoneyField, NumberField, SelectField } from '../components/Fields';
 import { StepsTable } from '../components/StepsTable';
+import { StatedComparisonChart } from '../components/charts/StatedComparisonChart';
 import { checkStatedCost, type Reconciliation } from '../../engine';
 import type { OfferId, StatedCostClaim } from '../../domain/dataset';
-import { CALCULABLE_COMPONENTS, COMPONENT_LABEL, UNCALCULATED_COMPONENTS, known, type ComponentId } from '../../domain/types';
+import {
+  CALCULABLE_COMPONENTS,
+  COMPONENT_LABEL,
+  UNCALCULATED_COMPONENTS,
+  known,
+  type ComponentId,
+} from '../../domain/types';
 import { DEFAULT_TOLERANCE_AMOUNT } from '../../engine/config';
 import { fromDollars } from '../../money/money';
 
@@ -42,6 +50,14 @@ export function CheckStatedCost() {
   );
   const [formKey, setFormKey] = useState(0);
 
+  // This view stays mounted so its entries survive switching tabs. When the
+  // whole dataset is replaced (reset or a successful import) it starts over.
+  useEffect(() => {
+    setClaim(dataset.statedCosts[0] ?? blankClaim(dataset.fiscalYear.start, dataset.fiscalYear.end));
+    setFormKey((n) => n + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [epoch]);
+
   const reconciliation = useMemo(
     () => checkStatedCost(dataset, claim, offerId),
     [dataset, claim, offerId],
@@ -63,77 +79,62 @@ export function CheckStatedCost() {
   }
 
   const toleranceValue =
-    claim.tolerance.kind === 'absolute'
-      ? claim.tolerance.amount
-      : DEFAULT_TOLERANCE_AMOUNT;
+    claim.tolerance.kind === 'absolute' ? claim.tolerance.amount : DEFAULT_TOLERANCE_AMOUNT;
+
+  const comparable =
+    reconciliation.verdict !== 'cannot-verify' &&
+    reconciliation.statedAmount.kind === 'known' &&
+    reconciliation.calculatedAmount.kind === 'known' &&
+    reconciliation.difference.kind === 'known';
 
   return (
-    <div className="stack">
-      <section className="section">
-        <div className="section__head">
-          <h2>The figure you want to check</h2>
-          <p className="section__hint">
-            Enter a published figure and say what it claims to cover. It is compared only
-            against the matching scope from the same calculation used elsewhere in this
-            application.
-          </p>
-        </div>
+    <div>
+      <header className="view-intro">
+        <h2>Does the stated figure match the calculation?</h2>
+        <VerdictPanel reconciliation={reconciliation} />
+      </header>
 
-        <div className="panel">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(18rem, 1fr))', gap: '0 1.5rem' }}>
-            <SelectField
-              label="Load a fictional example"
-              hint="Or edit the fields below to check your own figure."
-              value={claim.id}
-              options={[
-                ...dataset.statedCosts.map((c) => ({ value: c.id, label: c.label })),
-                { value: 'custom', label: 'Enter my own figure' },
-              ]}
-              onChange={loadClaim}
-            />
+      <div className="workbench">
+        <section className="controls" aria-labelledby="stated-inputs-heading">
+          <h3 className="pane-title" id="stated-inputs-heading">
+            The figure to check
+          </h3>
 
-            <SelectField
-              label="Check against"
-              value={offerId}
-              options={[
-                { value: 'A' as OfferId, label: dataset.offers.A.label },
-                { value: 'B' as OfferId, label: dataset.offers.B.label },
-              ]}
-              onChange={(value) => setOfferId(value)}
-            />
+          <SelectField
+            label="Load a fictional example"
+            value={claim.id}
+            options={[
+              ...dataset.statedCosts.map((c) => ({ value: c.id, label: c.label })),
+              { value: 'custom', label: 'Enter my own figure' },
+            ]}
+            onChange={loadClaim}
+          />
 
-            <MoneyField
-              key={`stated-${formKey}-${epoch}`}
-              label="Stated incremental cost"
-              value={claim.statedAmount}
-              onCommit={(state) =>
-                setClaim((current) => ({
-                  ...current,
-                  statedAmount: { ...current.statedAmount, state },
-                }))
-              }
-            />
+          <SelectField
+            label="Check against"
+            value={offerId}
+            options={[
+              { value: 'A' as OfferId, label: dataset.offers.A.label },
+              { value: 'B' as OfferId, label: dataset.offers.B.label },
+            ]}
+            onChange={(value) => setOfferId(value)}
+          />
 
-            <NumberField
-              key={`tolerance-${formKey}-${epoch}`}
-              label="Tolerance"
-              suffix="dollars"
-              hint="A prototype reconciliation tolerance, not an audit standard."
-              value={{
-                state: { kind: 'known', value: Number(toleranceValue.cents) / 100 },
-                provenance: 'user-assumption',
-              }}
-              onCommit={(state) => {
-                if (state.kind !== 'known') return;
-                setClaim((current) => ({
-                  ...current,
-                  tolerance: { kind: 'absolute', amount: fromDollars(state.value.toFixed(2)) },
-                }));
-              }}
-            />
+          <MoneyField
+            key={`stated-${formKey}`}
+            label="Stated incremental cost"
+            value={claim.statedAmount}
+            onCommit={(state) =>
+              setClaim((current) => ({
+                ...current,
+                statedAmount: { ...current.statedAmount, state },
+              }))
+            }
+          />
 
+          <div className="field-pair">
             <DateField
-              key={`start-${formKey}-${epoch}`}
+              key={`start-${formKey}`}
               label="Period the figure covers — from"
               value={known(claim.periodStart, 'user-assumption')}
               onCommit={(state) => {
@@ -142,9 +143,8 @@ export function CheckStatedCost() {
                 }
               }}
             />
-
             <DateField
-              key={`end-${formKey}-${epoch}`}
+              key={`end-${formKey}`}
               label="Period the figure covers — to"
               value={known(claim.periodEnd, 'user-assumption')}
               onCommit={(state) => {
@@ -155,7 +155,7 @@ export function CheckStatedCost() {
             />
           </div>
 
-          <fieldset style={{ marginTop: '1rem' }}>
+          <fieldset>
             <legend>What the figure claims to include</legend>
             {SELECTABLE_COMPONENTS.map((component) => {
               const id = `component-${component}`;
@@ -171,10 +171,16 @@ export function CheckStatedCost() {
                   <label htmlFor={id}>
                     {COMPONENT_LABEL[component]}
                     {uncalculated ? (
-                      <span className="field__hint"> — not calculated here; selecting it means the figure cannot be verified</span>
+                      <span className="field__hint">
+                        {' '}
+                        — not calculated here; selecting it means the figure cannot be verified
+                      </span>
                     ) : null}
                     {component === 'total-payroll' ? (
-                      <span className="field__hint"> — not an incremental scope; selecting it means the figure cannot be verified</span>
+                      <span className="field__hint">
+                        {' '}
+                        — not an incremental scope; selecting it means the figure cannot be verified
+                      </span>
                     ) : null}
                   </label>
                 </div>
@@ -182,47 +188,81 @@ export function CheckStatedCost() {
             })}
           </fieldset>
 
-          <div style={{ marginTop: '1rem' }}>
-            <div className="field">
-              <label className="field__label" htmlFor="document-label">
-                Supporting document label (optional)
-              </label>
-              <input
-                id="document-label"
-                type="text"
-                value={claim.documentLabel ?? ''}
-                onChange={(e) => setClaim((current) => ({ ...current, documentLabel: e.target.value }))}
-              />
-            </div>
-            <div className="field">
-              <label className="field__label" htmlFor="document-text">
-                Relevant passage (optional)
-              </label>
-              <span className="field__hint" id="document-text-hint">
-                Pasted or typed by you. This application does not read documents; there is
-                no automated extraction here.
-              </span>
-              <textarea
-                id="document-text"
-                aria-describedby="document-text-hint"
-                value={claim.documentText ?? ''}
-                onChange={(e) => setClaim((current) => ({ ...current, documentText: e.target.value }))}
-              />
-            </div>
+          <NumberField
+            key={`tolerance-${formKey}`}
+            label="Tolerance"
+            suffix="dollars"
+            hint="A prototype tolerance, not an audit standard."
+            value={{
+              state: { kind: 'known', value: Number(toleranceValue.cents) / 100 },
+              provenance: 'user-assumption',
+            }}
+            onCommit={(state) => {
+              if (state.kind !== 'known') return;
+              setClaim((current) => ({
+                ...current,
+                tolerance: { kind: 'absolute', amount: fromDollars(state.value.toFixed(2)) },
+              }));
+            }}
+          />
+
+          <div className="field">
+            <label className="field__label" htmlFor="document-label">
+              Supporting document label (optional)
+            </label>
+            <input
+              id="document-label"
+              type="text"
+              value={claim.documentLabel ?? ''}
+              onChange={(e) =>
+                setClaim((current) => ({ ...current, documentLabel: e.target.value }))
+              }
+            />
           </div>
-        </div>
-      </section>
+          <div className="field">
+            <label className="field__label" htmlFor="document-text">
+              Relevant passage (optional)
+            </label>
+            <span className="field__hint" id="document-text-hint">
+              Typed or pasted by you. Nothing here reads documents.
+            </span>
+            <textarea
+              id="document-text"
+              aria-describedby="document-text-hint"
+              value={claim.documentText ?? ''}
+              onChange={(e) =>
+                setClaim((current) => ({ ...current, documentText: e.target.value }))
+              }
+            />
+          </div>
+        </section>
 
-      <section className="section" aria-labelledby="verdict-heading">
-        <div className="section__head">
-          <h2 id="verdict-heading">Result</h2>
-        </div>
-        <VerdictPanel reconciliation={reconciliation} />
+        <section className="results" aria-labelledby="stated-results-heading">
+          <h3 className="pane-title" id="stated-results-heading">
+            Stated versus calculated
+          </h3>
 
-        <Disclosure summary="Reconciliation — inputs, formulas, assumptions and sources">
-          <ReconciliationDetail reconciliation={reconciliation} />
-        </Disclosure>
-      </section>
+          {comparable &&
+          reconciliation.statedAmount.kind === 'known' &&
+          reconciliation.calculatedAmount.kind === 'known' &&
+          reconciliation.difference.kind === 'known' ? (
+            <StatedComparisonChart
+              stated={reconciliation.statedAmount.value}
+              calculated={reconciliation.calculatedAmount.value}
+              difference={reconciliation.difference.value}
+            />
+          ) : (
+            <p className="notice">
+              No comparison is drawn. The scopes cannot be compared, so bars would imply a
+              measurement that was never made. The reason is stated above.
+            </p>
+          )}
+
+          <Disclosure summary="Reconciliation — inputs, formulas, assumptions and sources">
+            <ReconciliationDetail reconciliation={reconciliation} />
+          </Disclosure>
+        </section>
+      </div>
     </div>
   );
 }
@@ -242,7 +282,7 @@ function VerdictPanel({ reconciliation }: { reconciliation: Reconciliation }) {
       {reconciliation.refusalReason ? (
         <p>{reconciliation.refusalReason}</p>
       ) : (
-        <dl className="detail-list" style={{ marginTop: '0.5rem' }}>
+        <dl className="detail-list">
           <dt>Stated</dt>
           <dd>
             <Amount state={reconciliation.statedAmount} />
@@ -263,9 +303,8 @@ function VerdictPanel({ reconciliation }: { reconciliation: Reconciliation }) {
 
       {reconciliation.verdict === 'difference-requires-review' ? (
         <p style={{ marginTop: '0.75rem' }}>
-          A difference is not by itself a mistake. It can mean the figure was built on
-          different assumptions or a different scope. Confirm both before drawing a
-          conclusion.
+          A difference is not by itself a mistake. It can mean the figure was built on different
+          assumptions or a different scope. Confirm both before drawing a conclusion.
         </p>
       ) : null}
     </div>
@@ -281,7 +320,10 @@ function ReconciliationDetail({ reconciliation }: { reconciliation: Reconciliati
         <dt>Period claimed</dt>
         <dd>{reconciliation.periodDescription}</dd>
         <dt>Components claimed</dt>
-        <dd>{reconciliation.claimedComponents.map((c) => COMPONENT_LABEL[c]).join(', ') || 'None stated'}</dd>
+        <dd>
+          {reconciliation.claimedComponents.map((c) => COMPONENT_LABEL[c]).join(', ') ||
+            'None stated'}
+        </dd>
         <dt>Tolerance</dt>
         <dd>
           {reconciliation.toleranceDescription}
