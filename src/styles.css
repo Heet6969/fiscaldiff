@@ -1065,7 +1065,7 @@ details.inline-details > fieldset {
 }
 .adjust-row {
   display: grid;
-  grid-template-columns: minmax(7.5rem, 1fr) minmax(7.5rem, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0 var(--space-3);
   align-items: end;
   padding-bottom: var(--space-3);
@@ -1076,6 +1076,9 @@ details.inline-details > fieldset {
   margin-bottom: 0;
 }
 .adjust-row__remove {
+  grid-column: 1 / -1;
+  justify-self: end;
+  margin-top: var(--space-2);
   min-height: 2.5rem;
 }
 .adjust-summary {
@@ -1209,3 +1212,20 @@ details.inline-details > fieldset {
     color: #000;
   }
 }
+
+/* Compact controls and explicit explanations without changing calculation scope. */
+.controls, .controls fieldset, .adjust-row > *, .field { min-width: 0; }
+.controls input, .controls select, .controls textarea { max-width: 100%; }
+.adjust-row select, .adjust-row input { width: 100%; min-width: 0; }
+.adjustments > .button { width: 100%; white-space: normal; }
+.button { transition: background-color 140ms ease, border-color 140ms ease; }
+.button:active { filter: brightness(0.96); }
+.claim-scope { padding: 1rem; }
+.scope-intro { margin-bottom: 1rem; }
+.claim-scope .checkbox-option { padding: 0.5rem 0; margin: 0; }
+.claim-scope .checkbox-option + .checkbox-option { border-top: 1px solid var(--border); }
+.claim-scope .field__hint { display: block; margin-top: 0.2rem; line-height: 1.5; }
+.component-reason { min-width: 13rem; max-width: 28rem; color: var(--text-muted); font-size: 0.87rem; line-height: 1.5; }
+.blocked-explanation { margin-top: 0.75rem; padding: 0.85rem 1rem; border-left: 3px solid var(--slate-border); background: var(--slate-bg); border-radius: 0 var(--radius) var(--radius) 0; }
+.blocked-explanation p { margin-top: 0.5rem; }
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } }

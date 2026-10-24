@@ -35,6 +35,13 @@ const SELECTABLE_COMPONENTS: readonly ComponentId[] = [
   'total-payroll',
 ];
 
+const COMPONENT_EXPLANATIONS: Partial<Record<ComponentId, string>> = {
+  'employer-taxes': 'Outside this demo’s scope. The synthetic dataset covers pay changes; employer taxes would require additional employee information and calculation rules.',
+  pension: 'Outside this demo’s scope. Pension costs would require employee retirement-plan information and contribution rules beyond this synthetic pay dataset.',
+  benefits: 'Outside this demo’s scope. Benefit costs would require employee coverage information, eligibility and employer cost rules beyond this synthetic pay dataset.',
+  'total-payroll': 'Different scope: this check compares a change from baseline, not total payroll expenditure. Use the proposal comparison for modeled total expenditure.',
+};
+
 /** A typed tolerance as an amount, or null when it cannot be one. */
 function toleranceFromNumber(dollars: number): Tolerance | null {
   try {
@@ -165,8 +172,9 @@ export function CheckStatedCost() {
             />
           </div>
 
-          <fieldset>
+          <fieldset className="claim-scope">
             <legend>What the figure claims to include</legend>
+            <p className="field__hint scope-intro">Select only what the source figure includes. Selecting an unsupported cost keeps it visible and prevents verification; it does not estimate that cost.</p>
             {SELECTABLE_COMPONENTS.map((component) => {
               const id = `component-${component}`;
               const uncalculated = UNCALCULATED_COMPONENTS.includes(component);
@@ -183,13 +191,13 @@ export function CheckStatedCost() {
                     {uncalculated ? (
                       <span className="field__hint">
                         {' '}
-                        — not calculated here; selecting it means the figure cannot be verified
+                        — outside this demo’s scope; requires additional data and rules
                       </span>
                     ) : null}
                     {component === 'total-payroll' ? (
                       <span className="field__hint">
                         {' '}
-                        — not an incremental scope; selecting it means the figure cannot be verified
+                        — a total, rather than a change from baseline
                       </span>
                     ) : null}
                   </label>
@@ -382,10 +390,11 @@ function ReconciliationDetail({ reconciliation }: { reconciliation: Reconciliati
               <th scope="col" className="num">
                 Calculated for this period
               </th>
+              <th scope="col">Basis or reason</th>
             </tr>
           </thead>
           <tbody>
-            {reconciliation.componentLines.map((line) => (
+            {[...reconciliation.componentLines].sort((a, b) => SELECTABLE_COMPONENTS.indexOf(a.component) - SELECTABLE_COMPONENTS.indexOf(b.component)).map((line) => (
               <tr key={line.component}>
                 <th scope="row">{line.label}</th>
                 <td className="num">
@@ -395,6 +404,14 @@ function ReconciliationDetail({ reconciliation }: { reconciliation: Reconciliati
                     <span className="state-note">Not calculated here</span>
                   )}
                 </td>
+                <td className="component-reason">
+                  {COMPONENT_EXPLANATIONS[line.component] ?? (
+                    line.amount?.kind === 'excluded' ? line.amount.reason :
+                    line.amount?.kind === 'missing' || line.amount?.kind === 'unknown'
+                      ? `Required inputs for ${line.label.toLowerCase()} are missing, invalid or unknown. Correct the selected offer's inputs before comparing.`
+                      : 'Calculated from the selected offer for the claimed fiscal period.'
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -402,7 +419,13 @@ function ReconciliationDetail({ reconciliation }: { reconciliation: Reconciliati
       </div>
 
       <h3 style={{ marginTop: '1.5rem' }}>Calculation steps</h3>
-      <StepsTable steps={reconciliation.steps} />
+      {reconciliation.verdict === 'cannot-verify' && reconciliation.steps.length === 0 ? (
+        <div className="blocked-explanation">
+          <strong>No reconciliation was performed.</strong>
+          <p>{reconciliation.refusalReason}</p>
+          <p>Any component amounts above are shown for context only. They do not verify the full claim. Review the source's period and included components; keep unsupported costs selected if the source includes them.</p>
+        </div>
+      ) : <StepsTable steps={reconciliation.steps} />}
 
       <h3 style={{ marginTop: '1.5rem' }}>Assumptions applied</h3>
       <ul className="stack-tight">

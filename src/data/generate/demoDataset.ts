@@ -28,7 +28,7 @@ export const DEMO_SEED = 20260701;
 
 export const SYNTHETIC_LABEL = 'Synthetic demo data';
 
-const DEPARTMENT_NAME = 'Public Works — Township of Meadowbrook (fictional)';
+const DEPARTMENT_NAME = 'Public Works — Town of Trala La (fictional)';
 
 const ROLES: readonly { role: string; gradeStep: string }[] = [
   { role: 'Equipment Operator', gradeStep: 'PW-4 / Step 3' },

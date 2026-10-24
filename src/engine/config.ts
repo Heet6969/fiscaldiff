@@ -47,15 +47,15 @@ export const TOLERANCE_DISCLAIMER =
 export const STANDARD_EXCLUSIONS: readonly { category: string; reason: string }[] = [
   {
     category: 'Employer payroll taxes',
-    reason: 'No tax rate was supplied. The prototype does not assume one.',
+    reason: 'Outside this demo’s scope. The synthetic dataset covers salary, bonuses and overtime; employer taxes would require additional employee information and calculation rules.',
   },
   {
     category: 'Pension and retirement contributions',
-    reason: 'No contribution rate was supplied. The prototype does not assume one.',
+    reason: 'Outside this demo’s scope. Pension costs would require employee retirement-plan information and contribution rules beyond this synthetic pay dataset.',
   },
   {
     category: 'Health and other benefits',
-    reason: 'No benefit rates were supplied. The prototype does not assume any.',
+    reason: 'Outside this demo’s scope. Benefit costs would require employee coverage information and employer cost rules beyond this synthetic pay dataset.',
   },
   {
     category: 'Headcount and staffing changes',

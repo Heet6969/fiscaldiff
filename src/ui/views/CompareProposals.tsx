@@ -269,7 +269,9 @@ function KeyResult({
                   {formatSignedUSD(budget.remaining)}
                 </span>
               ) : (
-                'No workforce budget entered'
+                result.totalProposedExpenditure.kind !== 'known'
+                  ? 'Budget position unavailable — complete the offer inputs'
+                  : 'No workforce budget entered'
               )}
             </dd>
           </div>
@@ -369,10 +371,10 @@ function ResultsTable({
           <tr className="row--total">
             <th scope="row">Workforce budget remaining or shortfall</th>
             <td className="num">
-              <BudgetCell position={budgetA} />
+              <BudgetCell position={budgetA} calculationAvailable={a.totalProposedExpenditure.kind === 'known'} />
             </td>
             <td className="num">
-              <BudgetCell position={budgetB} />
+              <BudgetCell position={budgetB} calculationAvailable={b.totalProposedExpenditure.kind === 'known'} />
             </td>
           </tr>
         </tbody>
@@ -381,9 +383,9 @@ function ResultsTable({
   );
 }
 
-function BudgetCell({ position }: { position: BudgetPosition | undefined }) {
+function BudgetCell({ position, calculationAvailable }: { position: BudgetPosition | undefined; calculationAvailable: boolean }) {
   if (!position) {
-    return <span className="state-note">No budget entered</span>;
+    return <span className="state-note">{calculationAvailable ? 'No budget entered' : 'Budget position unavailable — complete the offer inputs'}</span>;
   }
   return (
     <>

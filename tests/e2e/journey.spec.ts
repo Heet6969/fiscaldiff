@@ -23,7 +23,7 @@ test.describe('core journey', () => {
 
     await expect(page.getByRole('heading', { name: /CivicVariance/, level: 1 })).toBeVisible();
     await expect(page.getByTestId('synthetic-badge')).toHaveText(/Synthetic demo data/);
-    await expect(page.getByText(/Township of Meadowbrook/).first()).toBeVisible();
+    await expect(page.getByText(/Town of Trala La/).first()).toBeVisible();
 
     // 50 fictional employees at $60,000 each.
     await expect(page.getByText('$3,000,000.00').first()).toBeVisible();
