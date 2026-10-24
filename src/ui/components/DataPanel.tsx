@@ -12,7 +12,7 @@ import { Disclosure } from './Common';
 import { ALL_SCHEMAS, templateCsv, type TableId } from '../../data/csv/schema';
 import { importTable, type ImportProblem } from '../../data/csv/importers';
 import { datasetTableToCsv } from '../../data/csv/serialize';
-import { downloadTextFile } from '../../export/breakdown';
+import { downloadCsvFile } from '../../export/breakdown';
 
 export function DataPanel() {
   const { dataset, replaceDataset, resetDemo } = useAppState();
@@ -141,14 +141,14 @@ export function DataPanel() {
           <button
             type="button"
             className="button button--secondary"
-            onClick={() => downloadTextFile(`template-${schema.fileName}`, templateCsv(schema))}
+            onClick={() => downloadCsvFile(`template-${schema.fileName}`, templateCsv(schema))}
           >
             Download blank template
           </button>
           <button
             type="button"
             className="button button--secondary"
-            onClick={() => downloadTextFile(schema.fileName, datasetTableToCsv(dataset, table))}
+            onClick={() => downloadCsvFile(schema.fileName, datasetTableToCsv(dataset, table))}
           >
             Download current data
           </button>

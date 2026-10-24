@@ -260,3 +260,39 @@ view's collapsed copy; new tests scope queries to the panel they mean. Added
 dollars, gap handling, stated-cost chart absent for "Cannot verify", view-switching
 preservation, layout at both widths, axe with every section expanded, colour roles,
 keyboard focus and print layout.
+
+### 2026-10-24 — CSV readability fix
+
+**Diagnosis.** The calculation report was written as UTF-8 with no byte-order mark,
+typed `text/csv;charset=utf-8;`, with bare LF row endings and three separate CSV
+writers. It contains real non-ASCII characters (— – ÷ × −). Without a BOM, Windows Excel
+assumes the Windows-1252 code page, so "—" appeared as "â€”". That was the cause of the
+unreadable text. Checked and found fine: quoting (a strict comma parse gave no errors and
+embedded quotes were doubled), the text itself (clean UTF-8, no U+FFFD, no `undefined`,
+`NaN` or serialised values), and money (plain decimals).
+
+**Change.** One shared writer, `src/data/csv/format.ts`, now produces the report, the
+blank templates and the current-data downloads: UTF-8 with a BOM, CRLF row endings
+(a line break inside a quoted cell stays a single LF, as Excel stores it), correct
+quoting, and every row padded to the same width. The report no longer shows "A — Offer
+A — …" and states that it is a report, not an import file. The importer strips a BOM if
+present; it changes nothing else about the text it reads.
+
+**Formula protection.** Exported text beginning with `=`, `+`, `-`, `@`, tab or carriage
+return gets a leading apostrophe. Numbers, including negatives such as `-25000.00`, and
+formatted amounts such as `-$25,000.00`, are left exactly as they are.
+
+**Known limitation.** The protection is one-way. The importer deliberately does not strip
+a leading apostrophe, because from the file alone it cannot tell protection from the
+user's own text, and guessing wrong would silently alter data. Text that began with
+`=`, `+`, `-` or `@` therefore returns from an export-then-import with the apostrophe
+visible. Only the per-table "current data" downloads promise round-trip import; the
+calculation report does not and the importer refuses it.
+
+**Verified.** A real download through the export button: first bytes `ef bb bf`, 88
+CRLF row endings, no bare LF or CR outside quoted cells, no parse errors, a regular
+6-field grid, "—" kept as a real character, difference written as `-25000.00`. The same
+file was opened in Microsoft Excel 16.0 through its automation interface: the title and
+"Offer A — union request" displayed correctly, 0 of 528 cells showed mojibake, and the
+difference cell was a number (`-25000`), not text. That was an automated read of cell
+values, not a visual inspection of the window.

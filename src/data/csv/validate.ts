@@ -13,6 +13,7 @@ import {
   type TableSchema,
 } from './schema';
 import { MoneyParseError, fromDecimalString, type Money } from '../../money/money';
+import { stripBom } from './format';
 import { isValidIsoDate, isValidYearMonth } from '../../engine/dates';
 import type { Input, Provenance, ValueState } from '../../domain/types';
 
@@ -46,8 +47,13 @@ const PROVENANCE_VALUES: readonly string[] = [
   'synthetic-sample',
 ];
 
-export function validateCsv(text: string, schema: TableSchema): ValidationOutcome {
+export function validateCsv(rawText: string, schema: TableSchema): ValidationOutcome {
   const problems: ImportProblem[] = [];
+
+  // Files saved by Excel or exported by this application start with a UTF-8
+  // byte-order mark. Left in place it would glue itself onto the first column
+  // name and make a valid file look like it has an unrecognised header.
+  const text = stripBom(rawText);
 
   if (text.trim() === '') {
     return { ok: false, problems: [{ row: null, column: null, message: 'The file is empty.' }] };

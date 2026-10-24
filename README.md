@@ -158,6 +158,13 @@ and an export re-imports cleanly.
 Example files, including deliberately invalid ones, are in
 [`public/fixtures/`](public/fixtures/).
 
+CSV downloads are UTF-8 with a byte-order mark and CRLF line endings, so Windows Excel
+shows characters such as "—" correctly. Exported text that starts with `=`, `+`, `-` or
+`@` gets a leading apostrophe so a spreadsheet cannot run it as a formula; numbers are
+left alone. The calculation report is for reading, not importing. Only the per-table
+"current data" downloads re-import, and protected text comes back with its apostrophe
+still on it.
+
 All file handling happens in the page. Nothing is uploaded — there is no server to
 upload to. A browser test asserts the application makes no external network requests.
 

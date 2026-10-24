@@ -10,6 +10,8 @@
  * "unknown", and the literal EXCLUDED means "excluded". A cell containing 0
  * means a known zero, which is a different thing from all three.
  */
+import { csvDocument } from './format';
+
 export const SENTINEL_UNKNOWN = 'UNKNOWN';
 export const SENTINEL_EXCLUDED = 'EXCLUDED';
 
@@ -230,11 +232,5 @@ export function schemaFor(id: TableId): TableSchema {
 
 /** Header row plus one example row, generated from the schema itself. */
 export function templateCsv(schema: TableSchema): string {
-  const header = schema.columns.map((c) => c.name).join(',');
-  const example = schema.columns.map((c) => quoteIfNeeded(c.example)).join(',');
-  return `${header}\n${example}\n`;
-}
-
-function quoteIfNeeded(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  return csvDocument([schema.columns.map((c) => c.name), schema.columns.map((c) => c.example)]);
 }

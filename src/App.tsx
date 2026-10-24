@@ -10,7 +10,7 @@ import { CompareProposals } from './ui/views/CompareProposals';
 import { ReviewOvertime } from './ui/views/ReviewOvertime';
 import { CheckStatedCost } from './ui/views/CheckStatedCost';
 import { PrintableReport } from './ui/views/PrintableReport';
-import { calculationBreakdownCsv, downloadTextFile } from './export/breakdown';
+import { calculationBreakdownCsv, downloadCsvFile } from './export/breakdown';
 import { checkStatedCost } from './engine';
 
 type TabId = 'compare' | 'overtime' | 'stated';
@@ -63,7 +63,7 @@ function Shell() {
 
   function exportBreakdown() {
     const claim = dataset.statedCosts[0];
-    downloadTextFile(
+    downloadCsvFile(
       'civicvariance-calculation-breakdown.csv',
       calculationBreakdownCsv({
         dataset,

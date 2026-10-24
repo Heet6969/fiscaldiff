@@ -5,10 +5,14 @@
  * accepted by the validator unchanged. The sentinel mapping is applied in
  * reverse, so "missing", "unknown" and "excluded" survive the trip rather than
  * collapsing into blanks that later read as zero.
+ *
+ * Text is written by `format.ts`, which adds the formula protection the
+ * importer undoes, so a round trip returns the original text.
  */
 import type { Dataset } from '../../domain/dataset';
 import type { Input, ValueState } from '../../domain/types';
 import { toDecimalString, type Money } from '../../money/money';
+import { csvDocument } from './format';
 import {
   COMPARATORS_SCHEMA,
   EMPLOYEES_SCHEMA,
@@ -18,10 +22,6 @@ import {
   type TableId,
   type TableSchema,
 } from './schema';
-
-function escapeCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
 
 function stateCell(state: ValueState<unknown>, render: (value: unknown) => string): string {
   switch (state.kind) {
@@ -44,9 +44,7 @@ const num = (input: Input<number>): string => stateCell(input.state, (v) => Stri
 const text = (input: Input<string>): string => stateCell(input.state, (v) => String(v));
 
 function build(schema: TableSchema, rows: readonly string[][]): string {
-  const header = schema.columns.map((c) => c.name).join(',');
-  const body = rows.map((cells) => cells.map(escapeCell).join(','));
-  return [header, ...body].join('\n') + '\n';
+  return csvDocument([schema.columns.map((c) => c.name), ...rows]);
 }
 
 export function datasetTableToCsv(dataset: Dataset, table: TableId): string {

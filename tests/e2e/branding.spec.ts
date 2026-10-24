@@ -58,9 +58,14 @@ test.describe('branding', () => {
     const stream = await file.createReadStream();
     const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-    const text = Buffer.concat(chunks).toString('utf8');
+    const bytes = Buffer.concat(chunks);
 
-    expect(text.split('\n')[0]).toBe('CivicVariance — calculation breakdown');
+    // Real bytes from a real download: UTF-8 BOM first, CRLF rows, readable text.
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const text = new TextDecoder('utf-8').decode(bytes);
+    // The title row is padded with empty fields so the file is a regular grid.
+    expect(text.split('\r\n')[0]).toMatch(/^CivicVariance — calculation breakdown,*$/);
+    expect(text).not.toMatch(/â€|\uFFFD/);
     expect(text).toContain(TAGLINE);
     expect(text).toContain('Synthetic demo data');
     expect(text).not.toContain('FiscalDiff');
