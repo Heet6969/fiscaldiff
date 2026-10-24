@@ -64,7 +64,7 @@ function Shell() {
   function exportBreakdown() {
     const claim = dataset.statedCosts[0];
     downloadTextFile(
-      'fiscaldiff-calculation-breakdown.csv',
+      'civicvariance-calculation-breakdown.csv',
       calculationBreakdownCsv({
         dataset,
         offerId: 'A',
@@ -87,7 +87,10 @@ function Shell() {
       <header className="site-header">
         <div className="site-header__inner">
           <div className="site-header__titles">
-            <h1>FiscalDiff — workforce budget impact</h1>
+            <h1>CivicVariance — workforce budget impact</h1>
+            <span className="site-header__context">
+              Understand workforce costs. Explain every difference.
+            </span>
             <span className="site-header__context">
               {dataset.department.name} · {dataset.fiscalYear.label}
             </span>
@@ -158,7 +161,7 @@ function Shell() {
 
         <footer>
           <p className="state-note">
-            FiscalDiff is a prototype built for Hackachusetts 2026. It runs entirely in this
+            CivicVariance is a prototype. Built at Sundai — Hackachusetts 2026. It runs entirely in this
             browser tab: no backend, no database, no payroll connection and no AI service at
             run time. All data shown is fictional. Employer taxes, pension and benefits are
             not calculated.

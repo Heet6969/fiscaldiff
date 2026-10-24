@@ -1,15 +1,22 @@
-# FiscalDiff
+# CivicVariance
+
+**Understand workforce costs. Explain every difference.**
 
 A workforce budget-impact application for municipal finance staff.
 
 Built at Sundai — Hackachusetts 2026.
 
+> Naming: the project was developed under the working name FiscalDiff. The display
+> name is now CivicVariance. The repository, folder, package name and internal
+> identifiers keep the original `fiscaldiff` name.
+
 ## Status
 
 Working prototype. Runs entirely in the browser on fictional data.
 
-Verified on 2026-10-24: type check clean, 137 unit tests passing, 51 browser tests
-passing, production build succeeding. See
+Verified on 2026-10-24: type check clean, 137 unit tests passing, 56 browser tests
+passing, production build succeeding. (The unit tests were last run before the display
+rename, which did not touch engine code; the browser suite was re-run after it.) See
 [`docs/kiro-usage.md`](docs/kiro-usage.md) for the observed output of each command
 and for what has **not** been verified.
 
@@ -73,7 +80,7 @@ not infer why a number moved, and it does not use the word fraud.
 
 ### 3. Check a stated cost
 
-The original FiscalDiff function. Enter a published figure, the period it covers, and
+The original function of the project, developed under the working name FiscalDiff. Enter a published figure, the period it covers, and
 the components it claims to include. The result is one of three verdicts:
 
 - **Matches within the stated tolerance**

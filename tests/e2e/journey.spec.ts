@@ -21,7 +21,7 @@ test.describe('core journey', () => {
   test('opens with labeled fictional data and a baseline summed from records', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /FiscalDiff/i, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /CivicVariance/, level: 1 })).toBeVisible();
     await expect(page.getByTestId('synthetic-badge')).toHaveText(/Synthetic demo data/);
     await expect(page.getByText(/Township of Meadowbrook/).first()).toBeVisible();
 
@@ -395,7 +395,7 @@ test.describe('core journey', () => {
     await page.getByRole('button', { name: 'Export calculation breakdown (CSV)' }).click();
     const file = await download;
 
-    expect(file.suggestedFilename()).toBe('fiscaldiff-calculation-breakdown.csv');
+    expect(file.suggestedFilename()).toBe('civicvariance-calculation-breakdown.csv');
 
     const stream = await file.createReadStream();
     const chunks: Buffer[] = [];
@@ -430,7 +430,7 @@ test.describe('core journey', () => {
     await page.getByRole('button', { name: 'Open printable summary' }).click();
 
     await expect(
-      page.getByRole('heading', { name: /Workforce budget impact — summary/ }),
+      page.getByRole('heading', { name: /CivicVariance — workforce budget impact summary/ }),
     ).toBeVisible();
     await expect(page.getByText(/All figures below are fictional/)).toBeVisible();
     await expect(page.getByText('FY2027 (July 1, 2026 – June 30, 2027)').first()).toBeVisible();

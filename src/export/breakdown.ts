@@ -43,7 +43,8 @@ export function calculationBreakdownCsv(context: ExportContext): string {
   const { dataset, offer, budget, generatedOn } = context;
   const lines: string[] = [];
 
-  lines.push(row(['FiscalDiff — calculation breakdown']));
+  lines.push(row(['CivicVariance — calculation breakdown']));
+  lines.push(row(['Tagline', 'Understand workforce costs. Explain every difference.']));
   lines.push(row(['Data', dataset.meta.label]));
   lines.push(row(['Caution', 'All figures are synthetic. Not a statement about any real municipality.']));
   lines.push(row(['Department', dataset.department.name]));

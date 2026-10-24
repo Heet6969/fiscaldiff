@@ -58,7 +58,8 @@ export function PrintableReport({
 
       <article className="stack">
         <header>
-          <h1>Workforce budget impact — summary</h1>
+          <h1>CivicVariance — workforce budget impact summary</h1>
+          <p className="state-note">Understand workforce costs. Explain every difference.</p>
           <p>
             <strong>{dataset.meta.label}.</strong> All figures below are fictional. This is
             not a statement about any real municipality, contract or official.
@@ -71,7 +72,7 @@ export function PrintableReport({
             <dt>Generated on</dt>
             <dd>{generatedOn}</dd>
             <dt>Prepared with</dt>
-            <dd>FiscalDiff — prototype, synthetic data only</dd>
+            <dd>CivicVariance — prototype, synthetic data only</dd>
           </dl>
         </header>
 

@@ -1,6 +1,6 @@
 # Third-party notices
 
-FiscalDiff's own code is MIT licensed — see [LICENSE](LICENSE), copyright 2026
+CivicVariance's own code is MIT licensed — see [LICENSE](LICENSE), copyright 2026
 Heet Shah. The dependencies below keep their own licenses, listed as reported by
 `npm view <package> license` at the versions actually installed.
 

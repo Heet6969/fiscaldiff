@@ -181,3 +181,39 @@ financial suite running. The outcome should be recorded here once observed.
    generator, so the "regeneration reproduces fixtures byte for byte" check in the
    spec became a determinism test on the generator plus a CSV export/import
    round-trip test instead.
+
+### 2026-10-24 — Display rename to CivicVariance
+
+Changed the display name from FiscalDiff to **CivicVariance**, with the tagline
+"Understand workforce costs. Explain every difference."
+
+Changed: the app header, the browser title and meta description, the printable
+report heading and "Prepared with" line, the CSV export title row and download file
+name (`civicvariance-calculation-breakdown.csv`), the in-app footer, `README.md`, and
+`THIRD-PARTY-NOTICES.md`. The footer and README keep "Built at Sundai — Hackachusetts
+2026.", Heet Shah, the Civic Action track, and the synthetic-data labels.
+
+Deliberately unchanged: the folder `F:\fiscaldiff`, the repository
+`https://github.com/Heet6969/fiscaldiff.git`, the npm package name `fiscaldiff`,
+internal identifiers and CSV schemas, the three view labels, Git history, and the
+earlier entries in this log, which describe the work under its original name. The
+steering document and the spec under `.kiro/specs/workforce-budget-impact/` also still
+say FiscalDiff; they are development records, not user-facing text.
+
+No engine, money, or domain code was changed by the rename.
+
+### 2026-10-24 — Hook execution check (second attempt)
+
+Made a comment-only edit to `src/engine/dates.ts` (no behavior change) to trigger the
+`PostFileSave` hook, then looked for any sign it ran: hook output returned with the
+edit, new `node`/`vitest` processes, and recently written files under `.kiro` and the
+Vite and Vitest caches. There was none. **The hook's automatic execution is still
+unverified.**
+
+No configuration change was made. The hook file is in the format Kiro's own hook
+tool wrote, its matcher and command were verified earlier, and nothing observed points
+to a specific misconfiguration. Kiro's description of `PostFileSave` is that it fires
+when a user saves a file, so a likely explanation is that a file edited by the agent
+does not count as a user save. That is an inference, not something observed. To close
+this out, save any file under `src/engine/`, `src/money/` or `src/domain/` by hand in
+the editor and note whether the financial suite runs.
