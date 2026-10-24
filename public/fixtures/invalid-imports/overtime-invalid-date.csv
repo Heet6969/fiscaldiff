@@ -1,0 +1,4 @@
+month,overtime_hours,overtime_dollars,overtime_budget_dollars,provenance,source_label
+2026-01,410.5,17750.00,18000.00,synthetic-sample,Invalid fixture
+Feb 2026,398.0,17220.00,18000.00,synthetic-sample,Invalid fixture
+2026-13,402.0,17400.00,18000.00,synthetic-sample,Invalid fixture

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --force",
     "test": "vitest run",
-    "test:financial": "vitest run src/money src/engine",
+    "test:financial": "vitest run money fiscalCalendar acceptance offer overtime reconcile invariants demoDataset",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },

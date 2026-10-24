@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildAcceptanceDataset } from './helpers/acceptanceCase';
 import { computeBudgetPosition, computeOffer } from '../../src/engine';
 import type { Dataset, OvertimeModel } from '../../src/domain/dataset';
-import { known, missing } from '../../src/domain/types';
+import { known, missing, type ValueState } from '../../src/domain/types';
 import { Decimal, fromDollars, toDecimalString, centsAsDecimal, roundHalfUpToBigInt } from '../../src/money/money';
 
 function withOffer(dataset: Dataset, id: 'A' | 'B', patch: Partial<Dataset['offers']['A']>): Dataset {
@@ -207,6 +207,30 @@ describe('overtime interaction with a raise', () => {
     expect(r.assumptions.join(' ')).toContain('held flat');
   });
 
+  it('keeps the annualized overtime increase when the effective date is absent', () => {
+    // The full-year figure at the new rate does not need the date; only the
+    // current-year portion does.
+    const base = buildAcceptanceDataset();
+    const dataset = withOffer(
+      { ...base, baselineOvertime: modeledOvertime(400) },
+      'A',
+      {
+        basePayRaisePercent: known(3, 'user-assumption'),
+        raiseEffectiveDate: missing('user-assumption'),
+        oneTimeBonusPerEmployee: known(fromDollars('0'), 'user-assumption'),
+        overtime: modeledOvertime(400),
+      },
+    );
+    const r = computeOffer(dataset, 'A');
+
+    expect(r.currentYearOvertimeIncrement.kind).toBe('missing');
+    expect(r.annualizedOvertimeIncrease.kind).toBe('known');
+    expect(r.annualizedBasePayIncrease.kind).toBe('known');
+    expect(toDecimalString(assertKnown(r.annualizedBasePayIncrease))).toBe('90000.00');
+    // So the recurring figure survives a missing effective date.
+    expect(r.annualizedRecurringIncrease.kind).toBe('known');
+  });
+
   it('refuses a total when modeled overtime hours are missing', () => {
     const base = buildAcceptanceDataset();
     const dataset = withOffer(
@@ -314,9 +338,9 @@ describe('missing salary data', () => {
   });
 });
 
-function assertKnown<T>(state: { kind: string } & Record<string, unknown>): T {
+function assertKnown<T>(state: ValueState<T>): T {
   if (state.kind !== 'known') {
     throw new Error(`expected a known value, received "${state.kind}"`);
   }
-  return state.value as T;
+  return state.value;
 }

@@ -39,7 +39,7 @@ import {
   sumStates,
 } from '../domain/valueState';
 import { STANDARD_EXCLUSIONS } from './config';
-import { computeBaseline, annualOvertimeCost, overtimeHourlyRate, type BaselineResult } from './baseline';
+import { computeBaseline, overtimeHourlyRate, type BaselineResult } from './baseline';
 import {
   PRORATION_CONVENTION,
   isWithinFiscalYear,
@@ -218,10 +218,14 @@ function determineCompleteness(
 
 function buildExclusions(dataset: Dataset, offer: Offer): Exclusion[] {
   const list: Exclusion[] = [...STANDARD_EXCLUSIONS];
+
+  // Only the overtime *increase* can be excluded here. Baseline overtime, when
+  // it is modeled, is part of the baseline and total figures and is shown in
+  // the baseline summary, so claiming it is excluded would be wrong.
   if (offer.overtime.kind === 'excluded') {
-    list.unshift({ category: 'Overtime', reason: offer.overtime.reason });
+    list.unshift({ category: 'Overtime increase', reason: offer.overtime.reason });
   } else if (dataset.baselineOvertime.kind === 'excluded') {
-    list.unshift({ category: 'Overtime', reason: dataset.baselineOvertime.reason });
+    list.unshift({ category: 'Overtime increase', reason: dataset.baselineOvertime.reason });
   }
   return list;
 }
@@ -423,7 +427,11 @@ function computeOvertimeIncrements(
   }
 
   const baselineCost = baseline.annualOvertimeCost;
-  if (baselineCost.kind === 'missing' || baselineCost.kind === 'unknown') {
+  if (baselineCost.kind !== 'known') {
+    if (baselineCost.kind === 'excluded') {
+      const state = excludedState<Money>(baselineCost.reason);
+      return { currentYear: state, annualized: state, absent, steps, warnings, assumptions };
+    }
     absent.push('Baseline overtime hours or rate');
     return {
       currentYear: baselineCost,
@@ -434,10 +442,7 @@ function computeOvertimeIncrements(
       assumptions,
     };
   }
-  if (baselineCost.kind === 'excluded') {
-    const state = excludedState<Money>(baselineCost.reason);
-    return { currentYear: state, annualized: state, absent, steps, warnings, assumptions };
-  }
+  const baselineAnnualCost: Money = baselineCost.value;
 
   const hours = valueOf(offerModel.monthlyHours);
   if (hours === undefined) {
@@ -486,45 +491,54 @@ function computeOvertimeIncrements(
   const preRateAnnualCost = multiplyByRate(preRate.value, annualHours);
   const rateUplift = subtract(postRate, preRate.value);
 
-  let offerCurrentYearCost: Money = preRateAnnualCost;
-  if (rateUplift.cents !== 0n) {
-    if (factor.kind !== 'known') {
-      absent.push('Raise effective date (needed to apply the derived overtime rate change)');
-      return {
-        currentYear: MISSING_STATE,
-        annualized: MISSING_STATE,
-        absent,
-        steps,
-        warnings,
-        assumptions,
-      };
-    }
+  // The annualized figure is a full year at the post-raise rate, so it does not
+  // depend on the effective date and is available even when that date is absent.
+  const offerAnnualizedCost = multiplyByRate(postRate, annualHours);
+  const annualizedAmount = subtract(offerAnnualizedCost, baselineAnnualCost);
+  const annualized = knownState(annualizedAmount);
+
+  // The current-year figure does need the date, because the uplift only applies
+  // from the effective date onward.
+  let currentYear: ValueState<Money>;
+  let offerCurrentYearCost: Money | undefined;
+
+  if (rateUplift.cents === 0n) {
+    offerCurrentYearCost = preRateAnnualCost;
+    currentYear = knownState(subtract(preRateAnnualCost, baselineAnnualCost));
+  } else if (factor.kind !== 'known') {
+    absent.push('Raise effective date (needed to apply the derived overtime rate change)');
+    currentYear = MISSING_STATE;
+  } else {
     const upliftFull = multiplyByRate(rateUplift, annualHours);
     offerCurrentYearCost = add(preRateAnnualCost, multiplyByRate(upliftFull, factor.value));
+    currentYear = knownState(subtract(offerCurrentYearCost, baselineAnnualCost));
   }
 
-  const offerAnnualizedCost = multiplyByRate(postRate, annualHours);
-
-  const currentYear = knownState(subtract(offerCurrentYearCost, baselineCost.value));
-  const annualized = knownState(subtract(offerAnnualizedCost, baselineCost.value));
-
   steps.push({
-    label: 'Overtime cost under this offer (current fiscal year)',
-    formula:
-      `${formatUSD(preRate.value)}/hour × ${hours} hours/month × 12` +
-      (rateUplift.cents !== 0n && factor.kind === 'known'
-        ? ` + rate uplift ${formatUSD(rateUplift)}/hour × ${annualHours.toString()} hours × ` +
-          `proration ${factor.value.toFixed(6)}`
-        : ''),
-    result: formatUSD(offerCurrentYearCost),
+    label: 'Overtime cost under this offer (full year at the new rate)',
+    formula: `${formatUSD(postRate)}/hour × ${hours} hours/month × 12`,
+    result: formatUSD(offerAnnualizedCost),
     provenance: offerModel.monthlyHours.provenance,
     sourceLabel: offerModel.monthlyHours.sourceLabel,
   });
-  steps.push({
-    label: 'Overtime increase over baseline (current fiscal year)',
-    formula: `${formatUSD(offerCurrentYearCost)} − baseline ${formatUSD(baselineCost.value)}`,
-    result: formatUSD(currentYear.value),
-  });
+
+  if (offerCurrentYearCost !== undefined && currentYear.kind === 'known') {
+    steps.push({
+      label: 'Overtime cost under this offer (current fiscal year)',
+      formula:
+        `${formatUSD(preRate.value)}/hour × ${hours} hours/month × 12` +
+        (rateUplift.cents !== 0n && factor.kind === 'known'
+          ? ` + rate uplift ${formatUSD(rateUplift)}/hour × ${annualHours.toString()} hours × ` +
+            `proration ${factor.value.toFixed(6)}`
+          : ''),
+      result: formatUSD(offerCurrentYearCost),
+    });
+    steps.push({
+      label: 'Overtime increase over baseline (current fiscal year)',
+      formula: `${formatUSD(offerCurrentYearCost)} − baseline ${formatUSD(baselineAnnualCost)}`,
+      result: formatUSD(currentYear.value),
+    });
+  }
 
   return { currentYear, annualized, absent, steps, warnings, assumptions };
 }
@@ -596,8 +610,9 @@ export function overtimeStressTest(
   multipliers: readonly number[] = [0.5, 0.75, 1, 1.25, 1.5],
 ): { readonly baseHours: number | undefined; readonly rows: readonly StressRow[] } {
   const offer = dataset.offers[offerId];
-  if (offer.overtime.kind === 'excluded') return { baseHours: undefined, rows: [] };
-  const baseHours = valueOf(offer.overtime.monthlyHours);
+  const overtimeModel = offer.overtime;
+  if (overtimeModel.kind === 'excluded') return { baseHours: undefined, rows: [] };
+  const baseHours = valueOf(overtimeModel.monthlyHours);
   if (baseHours === undefined) return { baseHours: undefined, rows: [] };
 
   const rows: StressRow[] = multipliers.map((m) => {
@@ -608,7 +623,13 @@ export function overtimeStressTest(
         ...dataset.offers,
         [offerId]: {
           ...offer,
-          overtime: { ...offer.overtime, monthlyHours: { ...offer.overtime.monthlyHours, state: { kind: 'known', value: monthlyHours } } },
+          overtime: {
+            ...overtimeModel,
+            monthlyHours: {
+              ...overtimeModel.monthlyHours,
+              state: { kind: 'known', value: monthlyHours },
+            },
+          },
         },
       } as Dataset['offers'],
     };

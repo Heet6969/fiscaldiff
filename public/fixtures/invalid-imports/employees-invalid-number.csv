@@ -1,0 +1,4 @@
+employee_id,role,grade_step,annual_base_salary,scheduled_hours_per_week,weeks_per_year,overtime_eligible,bonus_eligible,provenance,source_label
+MDW-301,Equipment Operator,PW-4 / Step 3,60000.00,40,52,true,true,synthetic-sample,Invalid fixture
+MDW-302,Maintenance Technician,PW-5 / Step 2,sixty thousand,40,52,true,true,synthetic-sample,Invalid fixture
+MDW-303,Sanitation Worker,PW-3 / Step 4,52000.999,40,52,true,true,synthetic-sample,Invalid fixture

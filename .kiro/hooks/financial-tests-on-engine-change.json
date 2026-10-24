@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run financial tests when calculation code changes",
+      "trigger": "PostFileSave",
+      "description": "Runs the financial test suite (money model, fiscal calendar, acceptance case, offers, overtime, reconciliation, invariants, demo figures) whenever a file in src/engine, src/money or src/domain is saved. A wrong number in these modules is the most expensive kind of bug in this project, so the tests run without being asked.",
+      "matcher": "src[\\\\/](engine|money|domain)[\\\\/].*\\.ts$",
+      "action": {
+        "type": "command",
+        "command": "npm run test:financial",
+        "timeout": 180
+      }
+    }
+  ]
+}

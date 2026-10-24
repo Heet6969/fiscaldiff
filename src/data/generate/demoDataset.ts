@@ -155,13 +155,20 @@ function buildOffers(): { A: Offer; B: Offer } {
       bonusPaymentDate: known('2026-12-18', 'source-supported', {
         sourceLabel: 'Fictional union proposal, Article 14 (synthetic)',
       }),
-      // Overtime starts excluded and disclosed, because no overtime rate has
-      // been confirmed for this scenario. Switch the basis on screen to model it.
+      // Same hours and multiplier as the baseline. Because the rate is derived
+      // from hourly base pay, it still rises with the raise from the effective
+      // date, which is the behaviour worth seeing on the opening screen.
       overtime: {
-        kind: 'excluded',
-        reason:
-          'No confirmed overtime rate or hours assumption has been entered for this offer. ' +
-          'Choose a rate basis under Overtime assumptions to include it.',
+        kind: 'modeled',
+        monthlyHours: known(420, 'user-assumption', {
+          sourceLabel: 'Entered assumption: 420 overtime hours per month, department-wide',
+        }),
+        rate: {
+          kind: 'derived',
+          multiplier: known(1.5, 'user-assumption', {
+            sourceLabel: 'Entered assumption: overtime paid at 1.5 × hourly base pay',
+          }),
+        },
       },
     },
     B: {
@@ -178,10 +185,16 @@ function buildOffers(): { A: Offer; B: Offer } {
       }),
       bonusPaymentDate: known('2026-10-30', 'user-assumption'),
       overtime: {
-        kind: 'excluded',
-        reason:
-          'No confirmed overtime rate or hours assumption has been entered for this offer. ' +
-          'Choose a rate basis under Overtime assumptions to include it.',
+        kind: 'modeled',
+        monthlyHours: known(420, 'user-assumption', {
+          sourceLabel: 'Entered assumption: 420 overtime hours per month, department-wide',
+        }),
+        rate: {
+          kind: 'derived',
+          multiplier: known(1.5, 'user-assumption', {
+            sourceLabel: 'Entered assumption: overtime paid at 1.5 × hourly base pay',
+          }),
+        },
       },
     },
   };
@@ -325,10 +338,13 @@ export function buildDemoDataset(): Dataset {
       },
     },
     overtimeRecords: buildOvertimeRecords(),
-    overtimeMonthlyBudget: known(fromDollars('18000'), 'user-assumption', {
+    // Set above typical monthly spend so the budget flag marks genuinely
+    // unusual months rather than firing most of the year, which would bury the
+    // patterns actually worth a look.
+    overtimeMonthlyBudget: known(fromDollars('22000'), 'user-assumption', {
       sourceLabel: 'Fictional adopted monthly overtime budget (synthetic)',
     }),
-    workforceBudget: known(fromDollars('3071000'), 'user-assumption', {
+    workforceBudget: known(fromDollars('3293000'), 'user-assumption', {
       sourceLabel: 'Fictional adopted workforce budget for FY2027 (synthetic)',
     }),
     offers: buildOffers(),

@@ -1,0 +1,7 @@
+employee_id,role,grade_step,annual_base_salary,scheduled_hours_per_week,weeks_per_year,overtime_eligible,bonus_eligible,provenance,source_label
+MDW-101,Equipment Operator,PW-4 / Step 3,61500.00,40,52,true,true,synthetic-sample,Fictional import example
+MDW-102,Equipment Operator,PW-4 / Step 1,57200.00,40,52,true,true,synthetic-sample,Fictional import example
+MDW-103,Maintenance Technician,PW-5 / Step 2,64800.00,40,52,true,true,synthetic-sample,Fictional import example
+MDW-104,Sanitation Worker,PW-3 / Step 4,52300.00,40,52,true,false,synthetic-sample,Fictional import example
+MDW-105,Water Systems Technician,PW-6 / Step 2,70100.00,40,52,false,true,synthetic-sample,Fictional import example
+MDW-106,Highway Maintainer,PW-4 / Step 1,56900.00,40,52,true,true,synthetic-sample,Fictional import example

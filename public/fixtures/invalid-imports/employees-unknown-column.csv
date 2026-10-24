@@ -1,0 +1,2 @@
+employee_id,role,grade_step,annual_base_salary,scheduled_hours_per_week,weeks_per_year,overtime_eligible,bonus_eligible,provenance,source_label,secret_adjustment
+MDW-501,Equipment Operator,PW-4 / Step 3,60000.00,40,52,true,true,synthetic-sample,Invalid fixture,1200.00

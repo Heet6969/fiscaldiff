@@ -81,5 +81,12 @@ desktop.ini
 .vscode/*
 !.vscode/extensions.json
 
+# ---- Test and inspection artifacts ----
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+screenshots/
+
 # ---- Kiro ----
 # .kiro is intentionally NOT ignored. Specs, steering, and hooks are tracked in Git.

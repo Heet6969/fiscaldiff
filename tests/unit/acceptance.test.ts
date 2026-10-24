@@ -58,7 +58,7 @@ describe('required financial acceptance case (synthetic)', () => {
   it('overtime and employer add-ons are reported as excluded, not as zero', () => {
     expect(result.currentYearOvertimeIncrement.kind).toBe('excluded');
     const categories = result.exclusions.map((e) => e.category);
-    expect(categories).toContain('Overtime');
+    expect(categories).toContain('Overtime increase');
     expect(categories).toContain('Employer payroll taxes');
     expect(categories).toContain('Pension and retirement contributions');
     expect(categories).toContain('Health and other benefits');

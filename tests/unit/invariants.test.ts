@@ -165,34 +165,50 @@ describe('arithmetic invariants', () => {
     );
   });
 
-  it('the annualized recurring increase never depends on the effective date', () => {
-    fc.assert(
-      fc.property(headcount, salaryCents, raisePercent, (hc, sal, pct) => {
-        const amounts = [
-          '2026-07-01',
-          '2026-10-09',
-          '2027-01-01',
-          '2027-06-30',
-          '2027-12-01',
-        ].map((date) =>
-          known1(
-            computeOffer(
-              buildDataset({
-                headcount: hc,
-                salaryCents: sal,
-                raisePercent: pct,
-                effectiveDate: date,
-                bonusCents: 0,
-              }),
-              'A',
-            ).annualizedRecurringIncrease,
-          ).cents,
-        );
-        expect(new Set(amounts.map(String)).size).toBe(1);
-      }),
-      { numRuns: 150 },
-    );
-  });
+  // Covered with overtime both excluded and modeled. With a derived overtime
+  // rate the annualized figure is a full year at the post-raise rate, so it
+  // still must not move with the effective date.
+  for (const overtimeMode of ['excluded', 'modeled'] as const) {
+    it(`the annualized recurring increase never depends on the effective date (overtime ${overtimeMode})`, () => {
+      const overtime: OvertimeModel =
+        overtimeMode === 'excluded'
+          ? excludedOvertime
+          : {
+              kind: 'modeled',
+              monthlyHours: known(420, 'user-assumption'),
+              rate: { kind: 'derived', multiplier: known(1.5, 'user-assumption') },
+            };
+
+      fc.assert(
+        fc.property(headcount, salaryCents, raisePercent, (hc, sal, pct) => {
+          const amounts = [
+            '2026-07-01',
+            '2026-10-09',
+            '2027-01-01',
+            '2027-06-30',
+            '2027-12-01',
+          ].map((date) =>
+            known1(
+              computeOffer(
+                buildDataset({
+                  headcount: hc,
+                  salaryCents: sal,
+                  raisePercent: pct,
+                  effectiveDate: date,
+                  bonusCents: 0,
+                  overtime,
+                  baselineOvertime: overtime,
+                }),
+                'A',
+              ).annualizedRecurringIncrease,
+            ).cents,
+          );
+          expect(new Set(amounts.map(String)).size).toBe(1);
+        }),
+        { numRuns: 100 },
+      );
+    });
+  }
 
   it('is deterministic: the same dataset always gives the same figures', () => {
     fc.assert(
