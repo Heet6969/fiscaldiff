@@ -333,3 +333,59 @@ with a tooltip open on each chart.
 **Limitations.** Touch was tested with Playwright's touch emulation, not on a physical
 device. The reduced-motion and print behaviour were checked from computed styles, not by
 printing. Tooltip text is spoken through the button labels rather than as a tooltip.
+
+### 2026-10-24 — Fixes from an independent review
+
+Eight reproducible findings, fixed without changing the design or feature scope.
+
+1. **One stated-cost check.** The check lived inside its own view while the CSV and the
+   printable summary used `statedCosts[0]` and Offer A, so all three could describe
+   different claims. The inputs now live in the shared app state and one function,
+   `resolveStatedCheck` (`src/engine/statedCheck.ts`), turns them into the outcome that the
+   screen, the CSV and the summary all read. Each names the offer compared against. The CSV
+   keeps its calculation breakdown for Offer A, labelled "Offer (calculation breakdown)", and
+   labels the stated-cost section's offer separately. The summary used to replace the
+   whole app; it is now an overlay beside it, with the app hidden but mounted, so entries
+   (including half-typed invalid ones) survive opening print preview and returning.
+2. **No verdict from a stale entry.** Clearing either period date, or entering an empty or
+   invalid tolerance, used to be ignored and the old value kept producing a verdict. Those
+   fields now hold "not valid" as an explicit state, no comparison is made, and the screen,
+   CSV and summary all say "Cannot compare yet" and list what to correct. Overtime thresholds
+   keep the last valid value (flags depend on it) but now say so, visibly, when an entry is
+   not applied.
+3. **Excluded is not zero in the scope gate.** A claimed component whose amount is
+   excluded now returns Cannot verify. Reproduction: overtime excluded, overtime-only claim
+   of $0 used to return Matches.
+4. **Missing raise blocks a derived overtime rate.** It previously assumed the rate was
+   unchanged. Dependent outputs are now blocked and the missing input is named. An
+   independently confirmed rate is unaffected.
+5. **Provenance after an edit.** An edited proposal value, or edited stated amount, becomes a
+   user assumption. The old source label and agreement passage move to a separate
+   `originalSource`, shown as "Replaced original — not support for this value" on screen and
+   in its own CSV column, so the passage no longer reads as support for the new number.
+6. **Money grouping.** `fromDecimalString` stripped every comma before validating, so "1,2,3"
+   became 123. Grouping is now checked first: groups of exactly three digits, no leading
+   zero group.
+7. **Comparator pay basis.** Rows are now comparable only if role, grade/step and pay basis
+   all match the subject; an hourly row against the annual-salary cohort is marked, with the
+   reason. The demonstration's hourly row (Carrow) is now correctly marked too.
+8. **Scrollable regions.** Every table wrapper is now a focusable, named region, which
+   resolves the `scrollable-region-focusable` failure. They are always focusable rather than
+   only when they overflow, because overflow is only known after layout and an accessibility
+   check can run before that; the cost is a few extra tab stops.
+
+**Tests found two problems in my own work.** The CSV assertions initially substring-matched a
+padded, quoted file and so failed on correct output; they now parse it. And a scripted edit to
+an existing test did not apply, which left an unscoped query that matched the hidden app, and
+the full run caught it.
+
+**Existing tests changed, and why.** Because the app now stays mounted behind the print
+summary, the text queries in the two print-preview tests (journey and branding) are scoped
+to `#print-report`. One assertion
+about the CSV's "Offer" row was updated for the renamed row. No assertion was weakened and no
+financial figure changed.
+
+**Observed results after the last change.** Type check clean. Unit suite: 11 files, 215
+tests passed. Production build: succeeded. Browser suite: 132 passed.
+
+**Not changed.** The Kiro hook's execution on save remains unobserved.

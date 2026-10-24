@@ -23,6 +23,7 @@ import { AssumptionsList, StepsTable } from '../components/StepsTable';
 import { ComparatorTable } from '../components/ComparatorTable';
 import { StackedCostChart, type StackedOffer } from '../components/charts/StackedCostChart';
 import { overtimeStressTest, type OfferResult } from '../../engine';
+import { SUBJECT_PAY_BASIS } from '../../engine/comparators';
 import type { BudgetPosition } from '../../engine/offer';
 import { formatSignedUSD, formatUSD, type Money } from '../../money/money';
 import type { OfferId } from '../../domain/dataset';
@@ -175,7 +176,7 @@ export function CompareProposals() {
                   rate basis under Overtime assumptions to use this.
                 </p>
               ) : (
-                <div className="table-wrap">
+                <div className="table-wrap" tabIndex={0} role="region" aria-label="Overtime hours stress test table">
                   <table>
                     <caption>
                       Varies one stated assumption — modeled overtime hours per month, from a
@@ -219,6 +220,7 @@ export function CompareProposals() {
                 comparators={dataset.comparators}
                 subjectRole={subject?.role ?? 'the subject position'}
                 subjectGradeStep={subject?.gradeStep ?? 'the subject grade'}
+                subjectPayBasis={SUBJECT_PAY_BASIS}
               />
             </Disclosure>
           </div>
@@ -279,7 +281,7 @@ function ResultsTable({
   budgetB: BudgetPosition | undefined;
 }) {
   return (
-    <div className="table-wrap">
+    <div className="table-wrap" tabIndex={0} role="region" aria-label="Offer comparison results table">
       <table>
         <caption>
           Fiscal year {a.fiscalYear.label} unless a row says otherwise.

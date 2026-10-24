@@ -24,14 +24,18 @@ import {
   stripBom,
 } from '../../src/data/csv/format';
 import { calculationBreakdownCsv } from '../../src/export/breakdown';
-import { checkStatedCost, computeEngineView, DEFAULT_REVIEW_THRESHOLDS } from '../../src/engine';
+import {
+  computeEngineView,
+  DEFAULT_REVIEW_THRESHOLDS,
+  initialStatedInputs,
+  resolveStatedCheck,
+} from '../../src/engine';
 import type { Dataset } from '../../src/domain/dataset';
 import { known } from '../../src/domain/types';
 import { fromDollars, toDecimalString } from '../../src/money/money';
 
 function buildReport(dataset: Dataset): string {
   const view = computeEngineView(dataset, DEFAULT_REVIEW_THRESHOLDS);
-  const claim = dataset.statedCosts[0];
   return calculationBreakdownCsv({
     dataset,
     offerId: 'A',
@@ -39,7 +43,7 @@ function buildReport(dataset: Dataset): string {
     budget: view.budgets.A,
     overtimeRows: view.overtimeRows,
     flags: view.flags.flags,
-    reconciliation: claim ? checkStatedCost(dataset, claim, 'A') : undefined,
+    statedCheck: resolveStatedCheck(dataset, initialStatedInputs(dataset)),
     generatedOn: '2026-10-24',
   });
 }
@@ -129,7 +133,8 @@ describe('row endings and structure', () => {
   });
 
   it('labels the offer once, without a doubled prefix', () => {
-    expect(report).toContain('Offer,Offer A — union request');
+    expect(report).toContain('Offer (calculation breakdown),Offer A — union request');
+    expect(report).toContain('Offer compared against,Offer A — union request');
     expect(report).not.toContain('A — Offer A');
   });
 

@@ -13,6 +13,8 @@ export * from './offer';
 export * from './overtime';
 export * from './flags';
 export * from './reconcile';
+export * from './statedCheck';
+export * from './comparators';
 
 import type { Dataset, OfferId } from '../domain/dataset';
 import type { ReviewThresholds } from './config';

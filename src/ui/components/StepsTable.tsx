@@ -7,7 +7,7 @@ export function StepsTable({ steps }: { steps: readonly CalcStep[] }) {
   }
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap" tabIndex={0} role="region" aria-label="Calculation steps table">
       <table>
         <caption>
           Each line shows the formula actually used and where its inputs came from.
@@ -39,6 +39,20 @@ export function StepsTable({ steps }: { steps: readonly CalcStep[] }) {
                 {step.agreementPassage ? (
                   <blockquote className="source-passage">{step.agreementPassage}</blockquote>
                 ) : null}
+                {step.originalSource ? (
+                  // Kept apart from the current basis on purpose: this is what the
+                  // edited value replaced, not support for it.
+                  <div className="original-source">
+                    <strong>Replaced original — not support for this value:</strong>{' '}
+                    {PROVENANCE_LABEL[step.originalSource.provenance]}
+                    {step.originalSource.sourceLabel ? `, ${step.originalSource.sourceLabel}` : ''}
+                    {step.originalSource.agreementPassage ? (
+                      <blockquote className="source-passage">
+                        {step.originalSource.agreementPassage}
+                      </blockquote>
+                    ) : null}
+                  </div>
+                ) : null}
               </td>
             </tr>
           ))}
@@ -65,7 +79,7 @@ export function AssumptionsList({
       </ul>
 
       <h3 style={{ marginTop: '1.5rem' }}>Excluded from every figure</h3>
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Excluded cost categories table">
         <table>
           <thead>
             <tr>

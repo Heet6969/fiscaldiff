@@ -16,7 +16,7 @@ import type { Dataset, OfferId } from '../domain/dataset';
 import { COMPONENT_LABEL, stateLabel, type ValueState } from '../domain/types';
 import { formatUSD, toDecimalString, type Money } from '../money/money';
 import type { BudgetPosition, OfferResult } from '../engine/offer';
-import type { Reconciliation } from '../engine/reconcile';
+import type { StatedCheckOutcome } from '../engine/statedCheck';
 import type { MonthlyOvertimeRow } from '../engine/overtime';
 import type { Flag } from '../engine/flags';
 import { CSV_MIME_TYPE, csvBytes, csvDocument } from '../data/csv/format';
@@ -28,7 +28,8 @@ export type ExportContext = {
   readonly budget: BudgetPosition | undefined;
   readonly overtimeRows: readonly MonthlyOvertimeRow[];
   readonly flags: readonly Flag[];
-  readonly reconciliation: Reconciliation | undefined;
+  /** The stated-cost check as currently set up, shared with the screen and print. */
+  readonly statedCheck: StatedCheckOutcome | undefined;
   /** Supplied by the caller so the engine stays clock-free. */
   readonly generatedOn: string;
 };
@@ -55,7 +56,7 @@ export function calculationBreakdownCsv(context: ExportContext): string {
   ]);
   rows.push(['Department', dataset.department.name]);
   rows.push(['Fiscal year', dataset.fiscalYear.label]);
-  rows.push(['Offer', offer.label]);
+  rows.push(['Offer (calculation breakdown)', offer.label]);
   rows.push(['Generated on', generatedOn]);
   rows.push([
     'Result completeness',
@@ -113,9 +114,28 @@ export function calculationBreakdownCsv(context: ExportContext): string {
   }
   rows.push(BLANK);
 
-  rows.push(['Calculation step', 'Formula', 'Result', 'Provenance', 'Source']);
+  rows.push([
+    'Calculation step',
+    'Formula',
+    'Result',
+    'Provenance',
+    'Source',
+    'Replaced original source (not support for the edited value)',
+  ]);
   for (const step of offer.steps) {
-    rows.push([step.label, step.formula, step.result, step.provenance ?? '', step.sourceLabel ?? '']);
+    const original = step.originalSource;
+    rows.push([
+      step.label,
+      step.formula,
+      step.result,
+      step.provenance ?? '',
+      step.sourceLabel ?? '',
+      original
+        ? [original.provenance, original.sourceLabel, original.agreementPassage]
+            .filter((part): part is string => part !== undefined && part !== '')
+            .join(' — ')
+        : '',
+    ]);
   }
   rows.push(BLANK);
 
@@ -132,25 +152,38 @@ export function calculationBreakdownCsv(context: ExportContext): string {
     for (const warning of offer.warnings) rows.push([warning]);
   }
 
-  if (context.reconciliation) {
-    const r = context.reconciliation;
+  const check = context.statedCheck;
+  if (check) {
     rows.push(BLANK);
     rows.push(['Stated-cost check']);
-    rows.push(['Claim', r.claimLabel]);
-    rows.push(['Verdict', r.verdictLabel]);
-    if (r.refusalReason) rows.push(['Reason', r.refusalReason]);
-    rows.push(['Period claimed', r.periodDescription]);
-    rows.push(['Components claimed', r.claimedComponents.map((c) => COMPONENT_LABEL[c]).join('; ')]);
-    rows.push(['Tolerance applied', r.toleranceDescription]);
-    const [stated] = amountCells(r.statedAmount);
-    const [calculated] = amountCells(r.calculatedAmount);
-    const [difference] = amountCells(r.difference);
-    rows.push(['Stated amount (USD)', stated]);
-    rows.push(['Calculated amount (USD)', calculated]);
-    rows.push(['Difference, stated minus calculated (USD)', difference]);
-    if (r.documentLabel) rows.push(['Source document', r.documentLabel]);
-  }
+    // The offer is named first and on every variant, so the section is never
+    // read as a check against whichever offer the breakdown above describes.
+    rows.push(['Offer compared against', check.offerLabel]);
 
+    if (check.kind === 'needs-correction') {
+      rows.push(['Claim', check.claimLabel]);
+      rows.push(['Status', 'Cannot compare yet — an entry needs correcting. Nothing was compared.']);
+      for (const problem of check.problems) rows.push(['Needs correction', problem]);
+      if (check.draft.documentLabel) rows.push(['Source document', check.draft.documentLabel]);
+      if (check.draft.documentText) rows.push(['Supporting passage', check.draft.documentText]);
+    } else {
+      const r = check.reconciliation;
+      rows.push(['Claim', r.claimLabel]);
+      rows.push(['Verdict', r.verdictLabel]);
+      if (r.refusalReason) rows.push(['Reason', r.refusalReason]);
+      rows.push(['Period claimed', r.periodDescription]);
+      rows.push(['Components claimed', r.claimedComponents.map((c) => COMPONENT_LABEL[c]).join('; ')]);
+      rows.push(['Tolerance applied', r.toleranceDescription]);
+      const [stated] = amountCells(r.statedAmount);
+      const [calculated] = amountCells(r.calculatedAmount);
+      const [difference] = amountCells(r.difference);
+      rows.push(['Stated amount (USD)', stated]);
+      rows.push(['Calculated amount (USD)', calculated]);
+      rows.push(['Difference, stated minus calculated (USD)', difference]);
+      if (r.documentLabel) rows.push(['Source document', r.documentLabel]);
+      if (r.documentText) rows.push(['Supporting passage', r.documentText]);
+    }
+  }
   if (context.overtimeRows.length > 0) {
     rows.push(BLANK);
     rows.push([

@@ -49,6 +49,9 @@ export type ComponentLine = {
 };
 
 export type Reconciliation = {
+  /** The offer this claim was checked against. */
+  readonly offerId: OfferId;
+  readonly offerLabel: string;
   readonly claimId: string;
   readonly claimLabel: string;
   readonly verdict: Verdict;
@@ -98,6 +101,8 @@ export function checkStatedCost(
   }));
 
   const base = {
+    offerId,
+    offerLabel: offerResult.label,
     claimId: claim.id,
     claimLabel: claim.label,
     statedAmount: claim.statedAmount.state,
@@ -163,13 +168,30 @@ export function checkStatedCost(
   }
 
   // ---- Required inputs for the matched scope ----
-  const blockedComponents = componentLines.filter(
-    (line) => line.amount === undefined || line.amount.kind === 'missing' || line.amount.kind === 'unknown',
+  // A claimed component that is missing, unknown or excluded has no calculated
+  // amount to compare against. An excluded component in particular must not be
+  // read as $0: "not calculated" and "calculated as zero" are different claims,
+  // and treating one as the other could report a match that was never measured.
+  const gapped = componentLines.filter(
+    (line) =>
+      line.amount === undefined || line.amount.kind === 'missing' || line.amount.kind === 'unknown',
   );
-  if (blockedComponents.length > 0) {
+  if (gapped.length > 0) {
     return cannotVerify(
-      `The calculation for ${blockedComponents.map((l) => l.label).join(', ')} is not available ` +
+      `The calculation for ${gapped.map((l) => l.label).join(', ')} is not available ` +
         'because required inputs are missing or unknown. A figure is not produced from a gap.',
+    );
+  }
+
+  const excludedLines = componentLines.filter((line) => line.amount?.kind === 'excluded');
+  if (excludedLines.length > 0) {
+    const reasons = excludedLines
+      .map((l) => (l.amount?.kind === 'excluded' ? `${l.label}: ${l.amount.reason}` : l.label))
+      .join('; ');
+    return cannotVerify(
+      `${excludedLines.map((l) => l.label).join(', ')} ` +
+        `${excludedLines.length === 1 ? 'is' : 'are'} excluded from this calculation (${reasons}), ` +
+        'so the claimed scope cannot be reproduced. An excluded component is not the same as $0.',
     );
   }
 
@@ -186,12 +208,6 @@ export function checkStatedCost(
         label: line.label,
         formula: 'Calculated for the claimed fiscal period from the shared engine',
         result: formatUSD(amount.value),
-      });
-    } else if (amount.kind === 'excluded') {
-      steps.push({
-        label: line.label,
-        formula: `Excluded from the calculation: ${amount.reason}`,
-        result: 'Excluded',
       });
     }
   }
@@ -212,6 +228,7 @@ export function checkStatedCost(
     provenance: claim.statedAmount.provenance,
     sourceLabel: claim.statedAmount.sourceLabel,
     agreementPassage: claim.statedAmount.agreementPassage,
+    originalSource: claim.statedAmount.originalSource,
   });
   steps.push({
     label: 'Difference (stated − calculated)',

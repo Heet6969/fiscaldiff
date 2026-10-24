@@ -4,7 +4,7 @@
  * Describes what the records say and flags patterns worth a human look. It does
  * not say why anything moved, and the only status word is "Needs review".
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppState } from '../state/AppState';
 import { Amount, Disclosure, NotEnoughData } from '../components/Common';
 import { NumberField } from '../components/Fields';
@@ -84,6 +84,10 @@ const METRIC_ORDER: readonly Metric[] = ['hours', 'dollars', 'effective', 'varia
 export function ReviewOvertime() {
   const { engine, thresholds, setThresholds, epoch } = useAppState();
   const [metric, setMetric] = useState<Metric>('hours');
+  // True when the field currently holds something that is not a usable number.
+  // The last valid threshold stays in force, and the screen says so.
+  const [invalid, setInvalid] = useState({ hours: false, cost: false });
+  useEffect(() => setInvalid({ hours: false, cost: false }), [epoch]);
 
   const rows = engine.overtimeRows;
   const totals = engine.overtimeTotals;
@@ -171,6 +175,7 @@ export function ReviewOvertime() {
               <span className="summary-detail">
                 Hours +{thresholds.hoursIncreasePercent}%, hourly cost ±
                 {thresholds.effectiveHourlyCostChangePercent}% — demonstration values
+                {invalid.hours || invalid.cost ? ' — an entry is not applied' : ''}
               </span>
             </summary>
             <div style={{ padding: '0.75rem' }}>
@@ -190,6 +195,7 @@ export function ReviewOvertime() {
                   if (state.kind === 'known') {
                     setThresholds({ ...thresholds, hoursIncreasePercent: state.value });
                   }
+                  setInvalid((current) => ({ ...current, hours: state.kind !== 'known' }));
                 }}
               />
               <NumberField
@@ -205,6 +211,7 @@ export function ReviewOvertime() {
                   if (state.kind === 'known') {
                     setThresholds({ ...thresholds, effectiveHourlyCostChangePercent: state.value });
                   }
+                  setInvalid((current) => ({ ...current, cost: state.kind !== 'known' }));
                 }}
               />
               <div className="checkbox-option">
@@ -222,6 +229,30 @@ export function ReviewOvertime() {
               </div>
             </div>
           </details>
+
+          {invalid.hours || invalid.cost ? (
+            // Visible even when the thresholds section is collapsed: the flags
+            // below are being computed from a value the person did not just type.
+            <div className="warnings" role="note" aria-label="Threshold entry not applied">
+              <h3>Threshold entry not applied</h3>
+              <ul>
+                {invalid.hours ? (
+                  <li>
+                    The hours-increase threshold is empty or not a valid number, so it is not
+                    applied. Flags still use the last valid value,{' '}
+                    {thresholds.hoursIncreasePercent}%.
+                  </li>
+                ) : null}
+                {invalid.cost ? (
+                  <li>
+                    The hourly-cost threshold is empty or not a valid number, so it is not
+                    applied. Flags still use the last valid value,{' '}
+                    {thresholds.effectiveHourlyCostChangePercent}%.
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
 
           <p className="state-note">
             Thresholds are demonstration values, not an industry standard or an anomaly detector.
@@ -282,7 +313,7 @@ export function ReviewOvertime() {
           ) : null}
 
           <Disclosure summary="Monthly records — table of the chart data">
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Monthly overtime records table">
               <table>
                 <caption>
                   Effective hourly cost is dollars divided by hours, shown only where both are

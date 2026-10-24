@@ -30,12 +30,57 @@ export type Provenance =
   /** Part of the fictional demonstration dataset. */
   | 'synthetic-sample';
 
+/**
+ * What an input said before a user edited it. Kept so the history is not lost,
+ * but held apart from the current provenance so an agreement passage is never
+ * presented as supporting a value it does not describe.
+ */
+export type OriginalSource = {
+  readonly provenance: Provenance;
+  readonly sourceLabel?: string;
+  readonly agreementPassage?: string;
+};
+
 export type Input<T> = {
   readonly state: ValueState<T>;
   readonly provenance: Provenance;
   readonly sourceLabel?: string;
   readonly agreementPassage?: string;
+  /** Present only after an edit replaced a sourced or sample value. */
+  readonly originalSource?: OriginalSource;
 };
+
+/**
+ * The input after a person typed a new value into it.
+ *
+ * An edited value is the user's own assumption, whatever it replaced. The
+ * original source label and agreement passage move to `originalSource` rather
+ * than staying where they would read as support for the new number.
+ */
+export function editedInput<T>(previous: Input<T>, state: ValueState<T>): Input<T> {
+  if (previous.provenance === 'user-assumption') {
+    // Already an assumption: keep whatever earlier original context it carries.
+    return { ...previous, state };
+  }
+
+  const hasContext = previous.sourceLabel !== undefined || previous.agreementPassage !== undefined;
+  return {
+    state,
+    provenance: 'user-assumption',
+    sourceLabel: 'Entered on screen',
+    ...(hasContext || previous.provenance === 'source-supported'
+      ? {
+          originalSource: {
+            provenance: previous.provenance,
+            ...(previous.sourceLabel !== undefined ? { sourceLabel: previous.sourceLabel } : {}),
+            ...(previous.agreementPassage !== undefined
+              ? { agreementPassage: previous.agreementPassage }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
 
 export function known<T>(
   value: T,
@@ -112,6 +157,8 @@ export type CalcStep = {
   readonly provenance?: Provenance;
   readonly sourceLabel?: string;
   readonly agreementPassage?: string;
+  /** Source of the value this edit replaced. Shown separately, never as support. */
+  readonly originalSource?: OriginalSource;
 };
 
 /**

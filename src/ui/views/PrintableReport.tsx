@@ -7,7 +7,6 @@
  */
 import { useAppState } from '../state/AppState';
 import { Amount } from '../components/Common';
-import { checkStatedCost } from '../../engine';
 import { formatSignedUSD, formatUSD } from '../../money/money';
 import type { BudgetPosition } from '../../engine/offer';
 import { formatYearMonthLong } from '../../engine/dates';
@@ -38,11 +37,9 @@ export function PrintableReport({
   generatedOn: string;
   onBack: () => void;
 }) {
-  const { dataset, engine } = useAppState();
+  const { dataset, engine, statedOutcome } = useAppState();
   const a = engine.offers.A;
   const b = engine.offers.B;
-  const claim = dataset.statedCosts[0];
-  const reconciliation = claim ? checkStatedCost(dataset, claim, 'A') : undefined;
   const flags = engine.flags.flags;
 
   return (
@@ -78,7 +75,7 @@ export function PrintableReport({
 
         <section>
           <h2>What each offer costs</h2>
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Offer comparison table">
             <table>
               <thead>
                 <tr>
@@ -169,38 +166,91 @@ export function PrintableReport({
           </div>
         </section>
 
-        {reconciliation ? (
-          <section>
-            <h2>Stated cost check</h2>
+        <section>
+          <h2>Stated cost check</h2>
+          {statedOutcome.kind === 'needs-correction' ? (
             <dl className="detail-list">
+              <dt>Offer compared against</dt>
+              <dd>{statedOutcome.offerLabel}</dd>
               <dt>Claim</dt>
-              <dd>{reconciliation.claimLabel}</dd>
+              <dd>{statedOutcome.claimLabel}</dd>
+              <dt>Status</dt>
+              <dd>
+                <strong>Cannot compare yet</strong> — an entry needs correcting. Nothing was
+                compared.
+              </dd>
+              <dt>Needs correction</dt>
+              <dd>
+                <ul className="stack-tight">
+                  {statedOutcome.problems.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              </dd>
+              {statedOutcome.draft.documentLabel ? (
+                <>
+                  <dt>Source document</dt>
+                  <dd>{statedOutcome.draft.documentLabel}</dd>
+                </>
+              ) : null}
+              {statedOutcome.draft.documentText ? (
+                <>
+                  <dt>Supporting passage</dt>
+                  <dd>{statedOutcome.draft.documentText}</dd>
+                </>
+              ) : null}
+            </dl>
+          ) : (
+            <dl className="detail-list">
+              <dt>Offer compared against</dt>
+              <dd>{statedOutcome.reconciliation.offerLabel}</dd>
+              <dt>Claim</dt>
+              <dd>{statedOutcome.reconciliation.claimLabel}</dd>
               <dt>Verdict</dt>
               <dd>
-                <strong>{reconciliation.verdictLabel}</strong>
-                {reconciliation.refusalReason ? ` — ${reconciliation.refusalReason}` : null}
+                <strong>{statedOutcome.reconciliation.verdictLabel}</strong>
+                {statedOutcome.reconciliation.refusalReason
+                  ? ` — ${statedOutcome.reconciliation.refusalReason}`
+                  : null}
               </dd>
+              <dt>Period claimed</dt>
+              <dd>{statedOutcome.reconciliation.periodDescription}</dd>
               <dt>Components claimed</dt>
-              <dd>{reconciliation.claimedComponents.map((c) => COMPONENT_LABEL[c]).join(', ')}</dd>
+              <dd>
+                {statedOutcome.reconciliation.claimedComponents
+                  .map((c) => COMPONENT_LABEL[c])
+                  .join(', ')}
+              </dd>
               <dt>Stated</dt>
               <dd>
-                <Amount state={reconciliation.statedAmount} />
+                <Amount state={statedOutcome.reconciliation.statedAmount} />
               </dd>
               <dt>Calculated</dt>
               <dd>
-                <Amount state={reconciliation.calculatedAmount} />
+                <Amount state={statedOutcome.reconciliation.calculatedAmount} />
               </dd>
               <dt>Difference</dt>
               <dd>
-                <Amount state={reconciliation.difference} signed />{' '}
+                <Amount state={statedOutcome.reconciliation.difference} signed />{' '}
                 <span className="state-note">(stated minus calculated)</span>
               </dd>
               <dt>Tolerance applied</dt>
-              <dd>{reconciliation.toleranceDescription}</dd>
+              <dd>{statedOutcome.reconciliation.toleranceDescription}</dd>
+              {statedOutcome.reconciliation.documentLabel ? (
+                <>
+                  <dt>Source document</dt>
+                  <dd>{statedOutcome.reconciliation.documentLabel}</dd>
+                </>
+              ) : null}
+              {statedOutcome.reconciliation.documentText ? (
+                <>
+                  <dt>Supporting passage</dt>
+                  <dd>{statedOutcome.reconciliation.documentText}</dd>
+                </>
+              ) : null}
             </dl>
-          </section>
-        ) : null}
-
+          )}
+        </section>
         <section>
           <h2>Overtime patterns needing review</h2>
           {flags.length === 0 ? (

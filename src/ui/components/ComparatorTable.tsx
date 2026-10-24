@@ -7,16 +7,19 @@
  */
 import type { Comparator } from '../../domain/dataset';
 import { formatIsoDateLong } from '../../engine/dates';
+import { compareToSubject, type PayBasis } from '../../engine/comparators';
 import { Amount } from './Common';
 
 export function ComparatorTable({
   comparators,
   subjectRole,
   subjectGradeStep,
+  subjectPayBasis,
 }: {
   comparators: readonly Comparator[];
   subjectRole: string;
   subjectGradeStep: string;
+  subjectPayBasis: PayBasis;
 }) {
   if (comparators.length === 0) {
     return <p className="state-note">No comparison rows are loaded.</p>;
@@ -30,10 +33,11 @@ export function ComparatorTable({
         are not equivalent and are marked below.
       </p>
 
-      <div className="table-wrap">
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Comparison municipalities table">
         <table>
           <caption>
-            Fictional municipalities. Compared against {subjectRole}, {subjectGradeStep}.
+            Fictional municipalities. Compared against {subjectRole}, {subjectGradeStep}, paid by{' '}
+            {subjectPayBasis === 'annual' ? 'annual salary' : 'hourly wage'}.
           </caption>
           <thead>
             <tr>
@@ -53,7 +57,11 @@ export function ComparatorTable({
           </thead>
           <tbody>
             {comparators.map((c) => {
-              const comparable = c.role === subjectRole && c.gradeStep === subjectGradeStep;
+              const verdict = compareToSubject(c, {
+                role: subjectRole,
+                gradeStep: subjectGradeStep,
+                payBasis: subjectPayBasis,
+              });
               const effective =
                 c.effectiveDate.state.kind === 'known'
                   ? formatIsoDateLong(c.effectiveDate.state.value)
@@ -74,10 +82,14 @@ export function ComparatorTable({
                     <Amount state={c.statedPay.state} />
                   </td>
                   <td>
-                    {comparable ? (
-                      'Same role and grade'
+                    {verdict.comparable ? (
+                      'Same role, grade and pay basis'
                     ) : (
-                      <span className="state-note">Not directly comparable</span>
+                      <>
+                        <span className="state-note">Not directly comparable</span>
+                        <br />
+                        <span className="state-note">{verdict.reasons.join('; ')}</span>
+                      </>
                     )}
                   </td>
                 </tr>

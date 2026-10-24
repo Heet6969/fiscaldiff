@@ -113,3 +113,51 @@ describe('formatting', () => {
     expect(compareMoney(fromDollars('3'), fromDollars('2'))).toBe(1);
   });
 });
+
+describe('thousands grouping is validated, not stripped', () => {
+  it('rejects malformed grouping instead of quietly removing the commas', () => {
+    for (const bad of [
+      '1,2,3',
+      '1,,000',
+      '12,34',
+      '1,23',
+      '1,2345',
+      ',123',
+      '123,',
+      '1,000,',
+      '1,00,000',
+      '0,001',
+      '1,234.5,6',
+      '$1,2,3',
+      '-1,,000',
+      '1,234,56',
+      '1 234',
+    ]) {
+      expect(() => fromDecimalString(bad), bad).toThrow(MoneyParseError);
+    }
+  });
+
+  it('still accepts correctly grouped thousands, with or without cents and a currency sign', () => {
+    expect(fromDecimalString('1,000').cents).toBe(100000n);
+    expect(fromDecimalString('12,345').cents).toBe(1234500n);
+    expect(fromDecimalString('123,456,789.12').cents).toBe(12345678912n);
+    expect(fromDecimalString('$3,000,000.00').cents).toBe(300000000n);
+    expect(fromDecimalString('-$25,000.00').cents).toBe(-2500000n);
+    expect(fromDecimalString('$-1,500').cents).toBe(-150000n);
+    expect(fromDecimalString('999').cents).toBe(99900n);
+  });
+
+  it('still accepts plain numbers of any length with no grouping', () => {
+    for (const [text, cents] of [
+      ['0', 0n],
+      ['5', 500n],
+      ['1000', 100000n],
+      ['1234567', 123456700n],
+      ['60000.00', 6000000n],
+      ['0.07', 7n],
+      ['007', 700n],
+    ] as const) {
+      expect(fromDecimalString(text).cents, text).toBe(cents);
+    }
+  });
+});

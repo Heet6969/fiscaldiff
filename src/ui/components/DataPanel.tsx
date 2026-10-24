@@ -114,7 +114,7 @@ export function DataPanel() {
             <p style={{ marginBottom: '0.5rem' }}>
               Your existing data has not changed. Fix the file and try again.
             </p>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Import problems table">
               <table>
                 <thead>
                   <tr>
@@ -158,7 +158,7 @@ export function DataPanel() {
         </div>
 
         <Disclosure summary={`Column reference for ${schema.label}`}>
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Column reference table">
             <table>
               <caption>
                 An empty cell records a value as missing. The word UNKNOWN records it as

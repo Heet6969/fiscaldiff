@@ -298,6 +298,7 @@ function computeBasePayIncrements(
       provenance: offer.basePayRaisePercent.provenance,
       sourceLabel: offer.basePayRaisePercent.sourceLabel,
       agreementPassage: offer.basePayRaisePercent.agreementPassage,
+      originalSource: offer.basePayRaisePercent.originalSource,
     });
   }
   if (currentYear.kind === 'known' && factor.kind === 'known') {
@@ -387,6 +388,7 @@ function computeOneTimeCost(
     provenance: offer.oneTimeBonusPerEmployee.provenance,
     sourceLabel: offer.oneTimeBonusPerEmployee.sourceLabel,
     agreementPassage: offer.oneTimeBonusPerEmployee.agreementPassage,
+    originalSource: offer.oneTimeBonusPerEmployee.originalSource,
   });
 
   return { amount: knownState(total), absent, steps, warnings };
@@ -469,9 +471,30 @@ function computeOvertimeIncrements(
   let postRate: Money = preRate.value;
 
   if (offerModel.rate.kind === 'derived') {
+    // A derived rate rises with the base-pay raise, so the raise is an input to
+    // it. If the raise is missing or unknown there is no basis for saying the
+    // rate stays the same; carrying on with "unchanged" would present a gap as a
+    // result. Block the dependent outputs and say which input is needed. (An
+    // independently confirmed rate does not depend on the raise, so it is not
+    // affected by this.)
+    if (raisePercent === undefined) {
+      const raiseState = offer.basePayRaisePercent.state as ValueState<Money>;
+      if (raiseState.kind === 'missing' || raiseState.kind === 'unknown') {
+        absent.push('Base-pay raise percentage (needed to apply the derived overtime rate change)');
+      }
+      return {
+        currentYear: raiseState,
+        annualized: raiseState,
+        absent,
+        steps,
+        warnings,
+        assumptions,
+      };
+    }
+
     const multiplier = valueOf(offerModel.rate.multiplier);
     const meanHourly = baseline.meanOvertimeEligibleHourlyCents;
-    if (multiplier !== undefined && meanHourly.kind === 'known' && raisePercent !== undefined) {
+    if (multiplier !== undefined && meanHourly.kind === 'known') {
       const raisedHourly = meanHourly.value.times(new Decimal(raisePercent).div(100).plus(1));
       postRate = fromCents(roundHalfUpToBigInt(raisedHourly.times(multiplier)));
     }
@@ -520,6 +543,7 @@ function computeOvertimeIncrements(
     result: formatUSD(offerAnnualizedCost),
     provenance: offerModel.monthlyHours.provenance,
     sourceLabel: offerModel.monthlyHours.sourceLabel,
+    originalSource: offerModel.monthlyHours.originalSource,
   });
 
   if (offerCurrentYearCost !== undefined && currentYear.kind === 'known') {

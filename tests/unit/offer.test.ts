@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildAcceptanceDataset } from './helpers/acceptanceCase';
 import { computeBudgetPosition, computeOffer } from '../../src/engine';
 import type { Dataset, OvertimeModel } from '../../src/domain/dataset';
-import { known, missing, type ValueState } from '../../src/domain/types';
+import { known, missing, unknownInput, type ValueState } from '../../src/domain/types';
 import { Decimal, fromDollars, toDecimalString, centsAsDecimal, roundHalfUpToBigInt } from '../../src/money/money';
 
 function withOffer(dataset: Dataset, id: 'A' | 'B', patch: Partial<Dataset['offers']['A']>): Dataset {
@@ -251,6 +251,65 @@ describe('overtime interaction with a raise', () => {
   });
 });
 
+describe('a missing raise blocks a derived overtime rate but not an independent one', () => {
+  function build(raise: ReturnType<typeof missing<number>> | ReturnType<typeof known<number>>, independent: boolean): Dataset {
+    const base = buildAcceptanceDataset();
+    const overtime: OvertimeModel = independent
+      ? {
+          kind: 'modeled',
+          monthlyHours: known(400, 'user-assumption'),
+          rate: { kind: 'independent', confirmedRate: known(fromDollars('43.27'), 'source-supported') },
+        }
+      : modeledOvertime(400);
+    return withOffer({ ...base, baselineOvertime: overtime }, 'A', {
+      basePayRaisePercent: raise,
+      oneTimeBonusPerEmployee: known(fromDollars('0'), 'user-assumption'),
+      overtime,
+    });
+  }
+
+  it('does not assume an unchanged rate when the raise is missing', () => {
+    const r = computeOffer(build(missing('user-assumption'), false), 'A');
+    expect(r.currentYearOvertimeIncrement.kind).toBe('missing');
+    expect(r.annualizedOvertimeIncrease.kind).toBe('missing');
+    // Everything that depends on it is blocked, not reported as a smaller total.
+    expect(r.currentYearTotalIncremental.kind).not.toBe('known');
+    expect(r.annualizedRecurringIncrease.kind).not.toBe('known');
+    expect(r.totalProposedExpenditure.kind).not.toBe('known');
+    expect(r.completeness.kind).not.toBe('complete');
+    const absent = r.completeness.kind === 'complete' ? [] : r.completeness.absentInputs;
+    expect(absent.join(' ')).toContain('Base-pay raise percentage');
+  });
+
+  it('treats an unknown raise the same way', () => {
+    const r = computeOffer(build(unknownInput('user-assumption'), false), 'A');
+    expect(r.currentYearOvertimeIncrement.kind).toBe('unknown');
+    expect(r.annualizedOvertimeIncrease.kind).toBe('unknown');
+    expect(r.currentYearTotalIncremental.kind).not.toBe('known');
+  });
+
+  it('does not treat a stated zero raise as missing', () => {
+    const r = computeOffer(build(known(0, 'user-assumption'), false), 'A');
+    expect(toDecimalString(assertKnown(r.currentYearOvertimeIncrement))).toBe('0.00');
+    expect(r.currentYearTotalIncremental.kind).toBe('known');
+  });
+
+  it('leaves an independently confirmed rate independent of the missing raise', () => {
+    const r = computeOffer(build(missing('user-assumption'), true), 'A');
+    // The confirmed rate and hours do not depend on the raise, so overtime stands.
+    expect(r.currentYearOvertimeIncrement.kind).toBe('known');
+    expect(toDecimalString(assertKnown(r.currentYearOvertimeIncrement))).toBe('0.00');
+    expect(toDecimalString(assertKnown(r.annualizedOvertimeIncrease))).toBe('0.00');
+    // The base-pay part still needs the raise, so the total is still withheld.
+    expect(r.currentYearBasePayIncrement.kind).toBe('missing');
+    expect(r.currentYearTotalIncremental.kind).not.toBe('known');
+  });
+
+  it('still raises a derived rate normally when the raise is present', () => {
+    const r = computeOffer(build(known(3, 'user-assumption'), false), 'A');
+    expect(assertKnown(r.annualizedOvertimeIncrease).cents).toBeGreaterThan(0n);
+  });
+});
 describe('A and B isolation', () => {
   it('computes B independently of A', () => {
     const base = buildAcceptanceDataset();

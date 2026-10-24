@@ -8,7 +8,7 @@
  */
 import type { Offer, OfferId, OvertimeModel } from '../../domain/dataset';
 import type { Input, ValueState } from '../../domain/types';
-import { known } from '../../domain/types';
+import { editedInput, known } from '../../domain/types';
 import { formatUSD, fromDollars, type Money } from '../../money/money';
 import { OVERTIME_BASIS_DISCLAIMER } from '../../engine/config';
 import { DateField, MoneyField, NumberField } from './Fields';
@@ -103,14 +103,14 @@ export function OfferForm({
           value={offer.basePayRaisePercent}
           max={100}
           onCommit={(state: ValueState<number>) =>
-            onChange({ basePayRaisePercent: { ...offer.basePayRaisePercent, state } })
+            onChange({ basePayRaisePercent: editedInput(offer.basePayRaisePercent, state) })
           }
         />
         <DateField
           label="Raise effective date"
           value={offer.raiseEffectiveDate}
           onCommit={(state) =>
-            onChange({ raiseEffectiveDate: { ...offer.raiseEffectiveDate, state } })
+            onChange({ raiseEffectiveDate: editedInput(offer.raiseEffectiveDate, state) })
           }
         />
       </div>
@@ -120,13 +120,13 @@ export function OfferForm({
           label="One-time bonus per eligible employee"
           value={offer.oneTimeBonusPerEmployee}
           onCommit={(state) =>
-            onChange({ oneTimeBonusPerEmployee: { ...offer.oneTimeBonusPerEmployee, state } })
+            onChange({ oneTimeBonusPerEmployee: editedInput(offer.oneTimeBonusPerEmployee, state) })
           }
         />
         <DateField
           label="Bonus payment date"
           value={offer.bonusPaymentDate}
-          onCommit={(state) => onChange({ bonusPaymentDate: { ...offer.bonusPaymentDate, state } })}
+          onCommit={(state) => onChange({ bonusPaymentDate: editedInput(offer.bonusPaymentDate, state) })}
         />
       </div>
 
@@ -193,7 +193,7 @@ export function OfferForm({
                 label="Modeled overtime hours per month"
                 suffix="hours, department-wide"
                 value={monthlyHours}
-                onCommit={(state) => patchOvertime({ monthlyHours: { ...monthlyHours, state } })}
+                onCommit={(state) => patchOvertime({ monthlyHours: editedInput(monthlyHours, state) })}
               />
               {basis === 'derived' ? (
                 <NumberField
@@ -203,7 +203,7 @@ export function OfferForm({
                   min={0}
                   onCommit={(state) =>
                     patchOvertime({
-                      rate: { kind: 'derived', multiplier: { ...multiplier, state } },
+                      rate: { kind: 'derived', multiplier: editedInput(multiplier, state) },
                     })
                   }
                 />
@@ -214,7 +214,7 @@ export function OfferForm({
                   value={confirmedRate}
                   onCommit={(state) =>
                     patchOvertime({
-                      rate: { kind: 'independent', confirmedRate: { ...confirmedRate, state } },
+                      rate: { kind: 'independent', confirmedRate: editedInput(confirmedRate, state) },
                     })
                   }
                 />

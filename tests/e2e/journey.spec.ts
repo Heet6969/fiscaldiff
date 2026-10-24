@@ -450,8 +450,11 @@ test.describe('core journey', () => {
     await expect(page.getByRole('heading', { name: 'Assumptions applied' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Excluded from every figure' })).toBeVisible();
     await expect(page.getByText('$73,276.00').first()).toBeVisible();
-    await expect(page.getByText(/Difference requiring review/)).toBeVisible();
-    await expect(page.getByText(/Needs review/).first()).toBeVisible();
+    // The app stays mounted behind the summary, so these are scoped to the summary.
+    const summary = page.locator('#print-report');
+    await expect(summary.getByText(/Difference requiring review/)).toBeVisible();
+    await expect(summary.getByText(/Needs review/).first()).toBeVisible();
+    await expect(summary.getByText('Offer compared against')).toBeVisible();
 
     // Both budget positions carry a word, so neither rests on the sign alone.
     const budgetRow = page.getByRole('row', { name: /Workforce budget remaining or shortfall/ });

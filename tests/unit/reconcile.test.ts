@@ -148,3 +148,100 @@ describe('reconciliation detail', () => {
     expect(r.toleranceDisclaimer).toContain('Not an audit standard');
   });
 });
+
+describe('an excluded component is not a zero', () => {
+  // In this dataset overtime is explicitly excluded for the baseline and for Offer A.
+  const excludedOvertime = buildAcceptanceDataset();
+
+  it('returns Cannot verify for an overtime-only claim of $0 (the reported repro)', () => {
+    const r = checkStatedCost(
+      excludedOvertime,
+      claim({
+        claimedComponents: ['overtime-increment'],
+        statedAmount: known(fromDollars('0'), 'synthetic-sample'),
+      }),
+      'A',
+    );
+    expect(r.verdict).toBe('cannot-verify');
+    expect(r.verdict).not.toBe('matches');
+    expect(r.refusalReason).toContain('Overtime increase');
+    expect(r.refusalReason).toContain('excluded');
+    expect(r.refusalReason).toContain('not the same as $0');
+    // No calculated figure or difference is manufactured.
+    expect(r.calculatedAmount.kind).not.toBe('known');
+    expect(r.difference.kind).not.toBe('known');
+  });
+
+  it('refuses a mixed claim rather than counting the excluded part as nothing', () => {
+    const r = checkStatedCost(
+      excludedOvertime,
+      claim({
+        claimedComponents: ['base-pay-increment', 'overtime-increment'],
+        // Equal to the base-pay figure alone, so a zero-fill would have "matched".
+        statedAmount: known(fromDollars('45000'), 'synthetic-sample'),
+      }),
+      'A',
+    );
+    expect(r.verdict).toBe('cannot-verify');
+    expect(r.refusalReason).toContain('Overtime increase');
+  });
+
+  it('names every excluded component when there are several', () => {
+    const r = checkStatedCost(
+      excludedOvertime,
+      claim({ claimedComponents: ['overtime-increment', 'base-pay-increment'] }),
+      'A',
+    );
+    expect(r.refusalReason).toMatch(/Overtime increase is excluded/);
+  });
+
+  it('still compares a genuinely calculated zero, which is a different thing', () => {
+    // Overtime modeled, with no change in hours or rate: a real, known $0.
+    const modeled: Dataset = {
+      ...excludedOvertime,
+      baselineOvertime: {
+        kind: 'modeled',
+        monthlyHours: known(400, 'user-assumption'),
+        rate: { kind: 'derived', multiplier: known(1.5, 'user-assumption') },
+      },
+      offers: {
+        ...excludedOvertime.offers,
+        A: {
+          ...excludedOvertime.offers.A,
+          basePayRaisePercent: known(0, 'user-assumption'),
+          overtime: {
+            kind: 'modeled',
+            monthlyHours: known(400, 'user-assumption'),
+            rate: { kind: 'derived', multiplier: known(1.5, 'user-assumption') },
+          },
+        },
+      },
+    };
+    const r = checkStatedCost(
+      modeled,
+      claim({
+        claimedComponents: ['overtime-increment'],
+        statedAmount: known(fromDollars('0'), 'synthetic-sample'),
+      }),
+      'A',
+    );
+    expect(r.verdict).toBe('matches');
+    expect(r.calculatedAmount.kind).toBe('known');
+  });
+
+  it('keeps the required acceptance comparison unchanged', () => {
+    const r = checkStatedCost(excludedOvertime, claim({ statedAmount: known(fromDollars('45000'), 'synthetic-sample') }), 'A');
+    expect(r.verdict).toBe('difference-requires-review');
+    if (r.difference.kind !== 'known') throw new Error('expected a difference');
+    expect(toDecimalString(r.difference.value)).toBe('-25000.00');
+  });
+
+  it('records which offer the claim was checked against', () => {
+    const a = checkStatedCost(excludedOvertime, claim({}), 'A');
+    const b = checkStatedCost(excludedOvertime, claim({}), 'B');
+    expect(a.offerId).toBe('A');
+    expect(b.offerId).toBe('B');
+    expect(a.offerLabel).toBe(excludedOvertime.offers.A.label);
+    expect(b.offerLabel).toBe(excludedOvertime.offers.B.label);
+  });
+});

@@ -11,7 +11,6 @@ import { ReviewOvertime } from './ui/views/ReviewOvertime';
 import { CheckStatedCost } from './ui/views/CheckStatedCost';
 import { PrintableReport } from './ui/views/PrintableReport';
 import { calculationBreakdownCsv, downloadCsvFile } from './export/breakdown';
-import { checkStatedCost } from './engine';
 
 type TabId = 'compare' | 'overtime' | 'stated';
 
@@ -37,14 +36,10 @@ function todayIso(): string {
 }
 
 function Shell() {
-  const { dataset, engine } = useAppState();
+  const { dataset, engine, statedOutcome } = useAppState();
   const [active, setActive] = useState<TabId>('compare');
   const [printing, setPrinting] = useState(false);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
-  if (printing) {
-    return <PrintableReport generatedOn={todayIso()} onBack={() => setPrinting(false)} />;
-  }
 
   function onTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | undefined;
@@ -62,7 +57,6 @@ function Shell() {
   }
 
   function exportBreakdown() {
-    const claim = dataset.statedCosts[0];
     downloadCsvFile(
       'civicvariance-calculation-breakdown.csv',
       calculationBreakdownCsv({
@@ -72,7 +66,7 @@ function Shell() {
         budget: engine.budgets.A,
         overtimeRows: engine.overtimeRows,
         flags: engine.flags.flags,
-        reconciliation: claim ? checkStatedCost(dataset, claim, 'A') : undefined,
+        statedCheck: statedOutcome,
         generatedOn: todayIso(),
       }),
     );
@@ -80,6 +74,18 @@ function Shell() {
 
   return (
     <>
+      {/*
+        The printable summary sits beside the app, not instead of it. The app
+        stays mounted and is only hidden while the summary is open, so nothing
+        the user typed, valid or not, is lost on the way to print preview and back.
+      */}
+      {printing ? (
+        <div id="print-report">
+          <PrintableReport generatedOn={todayIso()} onBack={() => setPrinting(false)} />
+        </div>
+      ) : null}
+
+      <div hidden={printing}>
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
@@ -176,6 +182,7 @@ function Shell() {
           </p>
         </footer>
       </main>
+      </div>
     </>
   );
 }

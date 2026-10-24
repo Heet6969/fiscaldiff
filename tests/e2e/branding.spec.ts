@@ -43,9 +43,10 @@ test.describe('branding', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
       'CivicVariance — workforce budget impact summary',
     );
-    await expect(page.getByText(TAGLINE)).toBeVisible();
-    await expect(page.getByText('CivicVariance — prototype, synthetic data only')).toBeVisible();
-    await expect(page.getByText(/All figures below are fictional/)).toBeVisible();
+    const summary = page.locator('#print-report');
+    await expect(summary.getByText(TAGLINE)).toBeVisible();
+    await expect(summary.getByText('CivicVariance — prototype, synthetic data only')).toBeVisible();
+    await expect(summary.getByText(/All figures below are fictional/)).toBeVisible();
     await expect(page.locator('body')).not.toContainText('FiscalDiff');
   });
 

@@ -37,19 +37,22 @@ export function fromDollars(dollars: number | string): Money {
 }
 
 /**
- * Strict parse of a decimal money string. Accepts an optional leading `$`,
- * thousands separators, a leading sign, and at most two decimal places.
- * Rejects anything else rather than coercing it.
+ * Strict parse of a decimal money string. Accepts an optional leading `$`, a
+ * leading sign, at most two decimal places, and thousands separators only when
+ * they are correctly placed: groups of exactly three digits, such as 1,234,567.
+ * Malformed grouping ("1,2,3", "1,,000", "12,34", ",123") is rejected rather
+ * than having its commas quietly removed, because "1,2,3" is far more likely a
+ * typing error than the amount 123.
  */
 export function fromDecimalString(raw: string): Money {
   const trimmed = raw.trim();
   if (trimmed === '') throw new MoneyParseError(raw);
 
-  let text = trimmed.replace(/,/g, '');
+  let text = trimmed;
   let negative = false;
 
-  // Accept -$100 and $-100 and (100) is NOT accepted: accounting parens are
-  // ambiguous enough that refusing is safer than guessing.
+  // Accept -$100 and $-100. Accounting parentheses such as (100) are NOT
+  // accepted: they are ambiguous enough that refusing is safer than guessing.
   if (text.startsWith('-')) {
     negative = true;
     text = text.slice(1);
@@ -61,14 +64,17 @@ export function fromDecimalString(raw: string): Money {
     text = text.slice(1);
   }
 
-  if (!/^\d+(\.\d{1,2})?$/.test(text)) throw new MoneyParseError(raw);
+  // Plain digits, or correctly grouped thousands. Checked before any comma is
+  // removed. The first group may not start with 0, so "0,001" is refused.
+  const plain = /^\d+(\.\d{1,2})?$/;
+  const grouped = /^[1-9]\d{0,2}(,\d{3})+(\.\d{1,2})?$/;
+  if (!plain.test(text) && !grouped.test(text)) throw new MoneyParseError(raw);
 
-  const [intPart = '0', fracPart = ''] = text.split('.');
+  const [intPart = '0', fracPart = ''] = text.replace(/,/g, '').split('.');
   const frac = (fracPart + '00').slice(0, 2);
   const cents = BigInt(intPart) * 100n + BigInt(frac);
   return { cents: negative ? -cents : cents };
 }
-
 export function add(...amounts: readonly Money[]): Money {
   let total = 0n;
   for (const a of amounts) total += a.cents;
