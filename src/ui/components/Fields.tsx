@@ -62,10 +62,13 @@ export function MoneyField({
   value,
   onCommit,
   allowEmpty = true,
+  allowNegative = false,
 }: BaseProps & {
   readonly value: Input<Money>;
   readonly onCommit: (state: ValueState<Money>) => void;
   readonly allowEmpty?: boolean;
+  /** Only for figures that can legitimately be savings, such as a stated incremental cost. */
+  readonly allowNegative?: boolean;
 }) {
   const id = useId();
   const [text, setText] = useState(() =>
@@ -84,7 +87,7 @@ export function MoneyField({
     }
     try {
       const parsed = fromDecimalString(trimmed);
-      if (parsed.cents < 0n) {
+      if (parsed.cents < 0n && !allowNegative) {
         setError('Enter an amount of zero or more.');
         onCommit({ kind: 'missing' });
         return;
@@ -94,7 +97,9 @@ export function MoneyField({
     } catch (caught) {
       setError(
         caught instanceof MoneyParseError
-          ? 'Enter a dollar amount, for example 500 or 1,250.50.'
+          ? allowNegative
+            ? 'Enter a dollar amount, for example 500, 1,250.50 or -2,000 for a saving.'
+            : 'Enter a dollar amount, for example 500 or 1,250.50.'
           : 'Enter a dollar amount.',
       );
       onCommit({ kind: 'missing' });

@@ -41,11 +41,33 @@ export type OvertimeModel =
       readonly rate: OvertimeRateBasis;
     };
 
+export type AdjustmentDirection = 'increase' | 'decrease';
+
+/**
+ * One row of a counterproposal's base-pay changes. The percentage is entered as
+ * a nonnegative number and the direction carries the sign.
+ */
+export type BasePayAdjustment = {
+  readonly id: string;
+  readonly direction: AdjustmentDirection;
+  /** Nonnegative percent, e.g. 3 for 3%. Missing or invalid blocks results. */
+  readonly percent: Input<number>;
+};
+
 export type Offer = {
   readonly id: 'A' | 'B';
   readonly label: string;
-  /** Percent, e.g. 3 for a 3% raise. */
+  /**
+   * Percent, e.g. 3 for a 3% raise. Used when `adjustments` is absent (Offer A).
+   * Ignored when `adjustments` is present: the net of those rows is used instead.
+   */
   readonly basePayRaisePercent: Input<number>;
+  /**
+   * Repeatable increase/decrease rows (Offer B). Their signed percentages are
+   * summed once, then applied to each employee's original salary; they are not
+   * compounded. An empty list is an explicit 0% change.
+   */
+  readonly adjustments?: readonly BasePayAdjustment[];
   readonly raiseEffectiveDate: Input<IsoDate>;
   readonly oneTimeBonusPerEmployee: Input<Money>;
   readonly bonusPaymentDate: Input<IsoDate>;

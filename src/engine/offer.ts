@@ -48,6 +48,12 @@ import {
   type FiscalYear,
 } from './fiscalCalendar';
 import { formatIsoDateLong } from './dates';
+import {
+  ADJUSTMENT_BASIS_NOTE,
+  ADJUSTMENT_SOURCE_LABEL,
+  formatSignedPercent,
+  netBasePayChange,
+} from './adjustments';
 
 export type OfferResult = {
   readonly offerId: OfferId;
@@ -88,7 +94,14 @@ export function computeOffer(dataset: Dataset, offerId: OfferId): OfferResult {
 
   // ---- Proration factor ----
   const effectiveDate = valueOf(offer.raiseEffectiveDate);
-  const raisePercent = valueOf(offer.basePayRaisePercent);
+  // The net base-pay change, computed once. Offer A has one percentage; Offer B
+  // may have several increase/decrease rows. Everything below reads the net, so
+  // base pay, derived overtime and the audit trail cannot use different numbers.
+  const change = netBasePayChange(offer);
+  const raisedOffer: Offer = { ...offer, basePayRaisePercent: change.input };
+  const raisePercent = valueOf(change.input);
+  absent.push(...change.problems);
+  if (change.usesRows) assumptions.push(ADJUSTMENT_BASIS_NOTE);
 
   let factor: ValueState<Decimal>;
   let prorationNote: string;
@@ -116,8 +129,25 @@ export function computeOffer(dataset: Dataset, offerId: OfferId): OfferResult {
   }
 
   // ---- Base pay ----
-  const basePay = computeBasePayIncrements(dataset, offer, factor);
-  absent.push(...basePay.absent);
+  const basePay = computeBasePayIncrements(dataset, raisedOffer, factor);
+  // When rows are the reason, say which; the generic line would only repeat it.
+  absent.push(
+    ...basePay.absent.filter(
+      (item) => !(change.problems.length > 0 && item === 'Base-pay raise percentage'),
+    ),
+  );
+  if (change.usesRows) {
+    steps.push({
+      label: 'Net base-pay change',
+      formula: `${change.summary}. ${ADJUSTMENT_BASIS_NOTE}`,
+      result:
+        change.input.state.kind === 'known'
+          ? formatSignedPercent(new Decimal(change.input.state.value))
+          : 'Not available',
+      provenance: 'user-assumption',
+      sourceLabel: ADJUSTMENT_SOURCE_LABEL,
+    });
+  }
   steps.push(...basePay.steps);
 
   // ---- One-time bonus ----
@@ -127,7 +157,7 @@ export function computeOffer(dataset: Dataset, offerId: OfferId): OfferResult {
   warnings.push(...bonus.warnings);
 
   // ---- Overtime ----
-  const overtime = computeOvertimeIncrements(dataset, offer, baseline, factor, raisePercent);
+  const overtime = computeOvertimeIncrements(dataset, raisedOffer, baseline, factor, raisePercent);
   absent.push(...overtime.absent);
   steps.push(...overtime.steps);
   warnings.push(...overtime.warnings);
@@ -292,7 +322,7 @@ function computeBasePayIncrements(
     steps.push({
       label: 'Annualized base-pay increase',
       formula:
-        `For each employee: round(annual salary × (1 + ${percent}%)) − annual salary, summed ` +
+        `For each employee: round(annual salary × (1 ${percent < 0 ? '−' : '+'} ${Math.abs(percent)}%)) − annual salary, summed ` +
         `across ${dataset.employees.length} employees`,
       result: formatUSD(annualized.value),
       provenance: offer.basePayRaisePercent.provenance,

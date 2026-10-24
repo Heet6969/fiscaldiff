@@ -230,6 +230,14 @@ export function CompareProposals() {
   );
 }
 
+/** Plain words for the sign of a change from baseline. */
+function changeWord(state: ValueState<Money>): string {
+  if (state.kind !== 'known') return 'change';
+  if (state.value.cents < 0n) return 'decrease (saving)';
+  if (state.value.cents === 0n) return 'no change';
+  return 'increase';
+}
+
 /** The answer to the view's question, before anything else. */
 function KeyResult({
   results,
@@ -247,7 +255,9 @@ function KeyResult({
             <dt>{result.label}</dt>
             <dd className="key-result__value">
               <Amount state={result.currentYearTotalIncremental} />{' '}
-              <span className="key-result__unit">increase this fiscal year</span>
+              <span className="key-result__unit">
+                {changeWord(result.currentYearTotalIncremental)} this fiscal year
+              </span>
             </dd>
             <dd className="key-result__sub">
               <Amount state={result.annualizedRecurringIncrease} /> a year once fully in effect
@@ -284,7 +294,8 @@ function ResultsTable({
     <div className="table-wrap" tabIndex={0} role="region" aria-label="Offer comparison results table">
       <table>
         <caption>
-          Fiscal year {a.fiscalYear.label} unless a row says otherwise.
+          Fiscal year {a.fiscalYear.label} unless a row says otherwise. A negative amount is a
+          decrease from baseline (a saving).
         </caption>
         <thead>
           <tr>

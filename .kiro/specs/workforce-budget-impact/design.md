@@ -592,3 +592,24 @@ Decisions that are assumptions rather than confirmed facts, carried as
 8. **Default tolerance** for the stated-cost check — needs a stated default.
 9. **Component taxonomy.** The `ComponentId` enum is fixed for the MVP. A claim using
    a component outside it resolves to "Cannot verify" rather than a guess.
+
+## 17. Counterproposal base-pay adjustments (Offer B)
+
+`Offer` gains an optional `adjustments: BasePayAdjustment[]` (id, direction, nonnegative
+percent as an `Input<number>`). When present, `basePayRaisePercent` is ignored.
+
+`netBasePayChange(offer)` (`src/engine/adjustments.ts`) is the single place that turns
+either shape into the one net percentage the engine uses. It sums the signed percentages with
+exact decimals, so `0.1 + 0.2` is `0.3`, and returns a blocked (`missing`) input with plain
+reasons for any unfinished or invalid row, or a combined net below −100%. `computeOffer` computes
+it once and hands the downstream functions an offer carrying that net, so base pay, a derived
+overtime rate and the audit trail cannot use different numbers.
+
+The net is applied once to each original salary, then rounded at the same single leaf as
+before. Signed results flow through unchanged: the integer-cent arithmetic and sums already
+handle negatives, and every "increase" label is paired with a note that negative means saving.
+Percent shares of a total are shown only for a positive total, so a share of a saving is never
+drawn. `describeBasePayChange` supplies one sentence for the CSV and the print summary.
+
+Open question carried forward: rows have one shared date by design. Separate dates per row,
+dollar-based adjustments and compounding are out of scope.

@@ -14,8 +14,8 @@ Built at Sundai — Hackachusetts 2026.
 
 Working prototype. Runs entirely in the browser on fictional data.
 
-Verified on 2026-10-24, after the fixes from an independent review: type check clean,
-215 unit tests passing across 11 files, 132 browser tests passing, production build
+Verified on 2026-10-24, after adding Offer B's increase/decrease rows: type check clean,
+249 unit tests passing across 12 files, 156 browser tests passing, production build
 succeeding. All three suites were run after the final change. See
 [`docs/kiro-usage.md`](docs/kiro-usage.md) for the observed output of each command
 and for what has **not** been verified.
@@ -50,8 +50,11 @@ and one shared calculation engine, so the three answers cannot disagree.
 
 ### 1. Compare proposals
 
-A baseline and two independent offers. Each offer takes a percentage base-pay raise
-and its effective date, a one-time bonus per eligible employee and its payment date,
+A baseline and two independent offers. Offer A takes the union's single base-pay
+percentage; Offer B, the counterproposal, takes any number of increase and decrease
+rows. Their signed percentages are added together and applied once to each original
+salary, not compounded, so +3% and −1% is a net +2%. A negative result is shown as a
+decrease from baseline (a saving). Each offer also takes an effective date, a one-time bonus per eligible employee and its payment date,
 and an explicit overtime assumption — either no overtime modeled, a rate derived from
 hourly base pay, or a separately confirmed rate.
 

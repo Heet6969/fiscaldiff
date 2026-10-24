@@ -125,6 +125,8 @@ export function CheckStatedCost() {
           <MoneyField
             key={`stated-${fieldKey}`}
             label="Stated incremental cost"
+            hint="Enter a negative amount, such as -2,000, for a stated saving."
+            allowNegative
             value={claim.statedAmount}
             onCommit={(state) =>
               updateStatedClaim((current) => ({

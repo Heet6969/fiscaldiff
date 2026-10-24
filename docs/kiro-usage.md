@@ -389,3 +389,49 @@ financial figure changed.
 tests passed. Production build: succeeded. Browser suite: 132 passed.
 
 **Not changed.** The Kiro hook's execution on save remains unobserved.
+
+### 2026-10-24 — Offer B increase/decrease rows
+
+Offer B's single percentage is now repeatable rows (direction, nonnegative percentage, remove,
+and "Add another increase/decrease"), initialised as one Increase row holding the existing
+2.5%. Offer A is unchanged. Spec: requirement 13, design section 17, tasks milestone 11.
+
+**Basis.** Signed percentages are summed first, then applied once to each employee's original
+salary with the existing single rounding point; they are not compounded, so +3% and −1% is
+exactly +2%. All rows share Offer B's one effective date and proration. No rows is an explicit
+0%. `netBasePayChange` (`src/engine/adjustments.ts`) is the one place the net is computed;
+`computeOffer` reads it once and passes the downstream functions an offer carrying it, so base
+pay, a derived overtime rate and the audit trail cannot use different numbers. Percentages are
+added as exact decimals.
+
+**Blocking.** An unfinished or invalid row blocks everything that depends on it and is named;
+it is never skipped, which would have quietly produced a different pay change. A combined net
+below −100% is refused with the reason. This is judged on the net, so a −110% pair offset by a
++30% row is accepted. A newly added row starts empty and therefore blocks until it is filled in
+or removed, which is deliberate. A derived overtime rate follows a decrease from the effective
+date; an independently confirmed rate stays independent, so it survives an unfinished row.
+
+**Signed values.** The integer-cent arithmetic already handled negatives, so the engine change
+was small. What changed was wording: a negative amount is a decrease from baseline (a saving),
+said in plain words beside the results table, the chart and the printable summary, in the CSV
+basis column, and in the key result ("decrease (saving)"). A percentage share is not shown for a
+non-positive total, so no share of a saving is ever drawn. A stated incremental cost may be
+negative; salaries, bonuses and budgets remain nonnegative. The CSV and the summary state Offer
+B's rows, net and date.
+
+**Verified, after the final change.** Type check clean. Unit: 12 files, 249 tests passed.
+Production build: succeeded. Browser: 156 passed. New coverage: `adjustments.test.ts` (34) and
+`offerBAdjustments.spec.ts` (24), covering unchanged totals, sum-not-compound, net decreases for
+base pay, derived overtime and budget, blocking and the −100% limit, row add/remove, state
+through print preview, Offer A unchanged, and signed values agreeing across screen, stated-cost
+check, CSV and print.
+
+**One existing assertion changed:** the check that Offer B was untouched by an Offer A edit now
+reads the value of Offer B's first row (still 2.5) instead of a single field that no longer exists.
+
+**Mistakes while building this.** A scripted multi-pair edit aborted part-way and left a
+duplicate import and a duplicate helper; the type checker caught both and they were removed.
+
+**Limits.** One shared effective date for all rows; percentages only; no compounding option. At
+most 100% per row (the existing cap), with the −100% net rule as the real guard. The CSV
+breakdown is still for Offer A; Offer B's rows appear as a line and in the stated-cost section.

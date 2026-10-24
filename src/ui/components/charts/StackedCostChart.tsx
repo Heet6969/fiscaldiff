@@ -281,7 +281,7 @@ export function StackedCostChart({ offers }: { offers: readonly StackedOffer[] }
       </div>
 
       <figcaption className="figure-note">
-        Bars show the increase over baseline for this fiscal year. The axis includes $0.
+        Bars show the change from baseline for this fiscal year. A bar to the left of $0 is a decrease (a saving). The axis includes $0.
       </figcaption>
 
       <ul className="legend" aria-label="Chart legend with exact amounts">

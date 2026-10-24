@@ -174,9 +174,20 @@ function buildOffers(): { A: Offer; B: Offer } {
     B: {
       id: 'B',
       label: 'Offer B — alternative',
+      // Kept for reference only: Offer B's pay change is the `adjustments` rows
+      // below, whose net is what the engine uses.
       basePayRaisePercent: known(2.5, 'user-assumption', {
         sourceLabel: 'Entered as a negotiating alternative',
       }),
+      adjustments: [
+        {
+          id: 'adj-1',
+          direction: 'increase',
+          percent: known(2.5, 'user-assumption', {
+            sourceLabel: 'Entered as a negotiating alternative',
+          }),
+        },
+      ],
       raiseEffectiveDate: known('2026-09-01', 'user-assumption', {
         sourceLabel: 'Entered as a negotiating alternative',
       }),

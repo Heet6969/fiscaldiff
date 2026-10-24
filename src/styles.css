@@ -1059,6 +1059,44 @@ details.inline-details > fieldset {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+/* Offer B's increase/decrease rows. */
+.adjustments {
+  margin-top: var(--space-3);
+}
+.adjust-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(7.5rem, 1fr) auto;
+  gap: 0 var(--space-3);
+  align-items: end;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.adjust-row .field {
+  margin-bottom: 0;
+}
+.adjust-row__remove {
+  min-height: 2.5rem;
+}
+.adjust-summary {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+}
+.adjust-summary .field__error {
+  margin: var(--space-1) 0 0;
+}
+@media (max-width: 26rem) {
+  .adjust-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .adjust-row__remove {
+    grid-column: 1 / -1;
+  }
+}
+
 .source-passage {
   border-left: 3px solid var(--control-border);
   margin: var(--space-2) 0 0;

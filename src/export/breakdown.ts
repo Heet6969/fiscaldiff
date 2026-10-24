@@ -20,6 +20,7 @@ import type { StatedCheckOutcome } from '../engine/statedCheck';
 import type { MonthlyOvertimeRow } from '../engine/overtime';
 import type { Flag } from '../engine/flags';
 import { CSV_MIME_TYPE, csvBytes, csvDocument } from '../data/csv/format';
+import { describeBasePayChange } from '../engine/adjustments';
 
 export type ExportContext = {
   readonly dataset: Dataset;
@@ -57,6 +58,8 @@ export function calculationBreakdownCsv(context: ExportContext): string {
   rows.push(['Department', dataset.department.name]);
   rows.push(['Fiscal year', dataset.fiscalYear.label]);
   rows.push(['Offer (calculation breakdown)', offer.label]);
+  // The counterproposal's rows and net, so a reader can see what Offer B assumes.
+  rows.push(['Offer B base-pay changes', describeBasePayChange(dataset.offers.B)]);
   rows.push(['Generated on', generatedOn]);
   rows.push([
     'Result completeness',
@@ -84,7 +87,11 @@ export function calculationBreakdownCsv(context: ExportContext): string {
       offer.oneTimeCost,
       'Explicitly eligible employees, paid in this period',
     ],
-    ['Current fiscal-year incremental cost', offer.currentYearTotalIncremental, 'Increase over baseline'],
+    [
+      'Current fiscal-year incremental cost',
+      offer.currentYearTotalIncremental,
+      'Change from baseline; a negative amount is a decrease (a saving)',
+    ],
     [
       'Annualized recurring increase',
       offer.annualizedRecurringIncrease,

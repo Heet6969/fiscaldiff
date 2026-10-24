@@ -526,6 +526,49 @@ and SHALL be verified to execute during implementation.
 
 ---
 
+## Requirement 13 — Counterproposal base-pay adjustments (Offer B)
+
+**User story:** As a finance analyst, I want to model a counterproposal as several
+increases and decreases, so I can test a trade-off without recomputing by hand.
+
+### Acceptance criteria
+
+13.1. Offer A SHALL keep one union-proposed base-pay percentage and effective date, both
+editable.
+
+13.2. Offer B SHALL replace its single percentage with repeatable rows, each holding a
+direction (Increase or Decrease), a nonnegative percentage, and a remove control, plus an
+"Add another increase/decrease" control. The existing alternative SHALL initialise as one
+Increase row holding its current percentage, leaving every existing figure unchanged.
+
+13.3. The signed percentages SHALL be summed first and the net applied once to each
+employee's original salary using the existing exact-money rounding. They SHALL NOT be
+compounded: +3% and −1% is exactly a net +2%.
+
+13.4. All rows SHALL share Offer B's one effective date and proration. No rows SHALL be an
+explicit 0% adjustment, not a missing value.
+
+13.5. An unfinished or invalid row SHALL block every dependent result and name the row;
+it SHALL NOT be skipped. A combined change below −100% SHALL be refused with a reason, so a
+salary is never negative.
+
+13.6. A derived overtime rate SHALL follow the resulting pay change from the effective
+date, including a decrease; an independently confirmed rate SHALL stay independent.
+
+13.7. The one-time bonus SHALL remain separate. Offer B SHALL be calculated against the
+baseline independently of Offer A.
+
+13.8. The interface SHALL show a compact "Net base-pay change" and the basis in one
+sentence. Counterproposal adjustments are user assumptions.
+
+13.9. A decrease SHALL be shown as a negative amount everywhere — results, charts, budget
+position, stated-cost check, CSV and printable summary — with a plain-words note that a
+negative amount is a decrease from baseline (a saving).
+
+13.10. A stated incremental cost MAY be negative, to check a saving. Salaries, bonuses and
+budgets SHALL remain nonnegative.
+
+13.11. The CSV and printable summary SHALL state Offer B's rows, net and effective date.
 ## Out of scope for this MVP
 
 Named here so they are not mistaken for planned MVP behavior:

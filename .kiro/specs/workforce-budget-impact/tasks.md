@@ -228,6 +228,18 @@ explicitly incomplete and marked below. Observed command output is in
 
 ---
 
+## Milestone 11 — Counterproposal adjustments (Offer B)
+
+- [x] 11.1 `BasePayAdjustment` type and `netBasePayChange` (sum, validate, refuse below −100%)
+      _Requirements: 13.3–13.5_
+- [x] 11.2 Engine reads the net once; derived overtime follows it; independent rate does not
+      _Requirements: 13.4, 13.6, 13.7_
+- [x] 11.3 Repeatable-row editor with net summary and basis note; Offer A unchanged
+      _Requirements: 13.1, 13.2, 13.8_
+- [x] 11.4 Signed wording across results, chart, CSV and print; negative stated cost allowed
+      _Requirements: 13.9–13.11_
+- [x] 11.5 Unit and browser regression tests for each criterion above
+      _Requirements: 13.1–13.11_
 ## Deferred to protect the core
 
 Not in the MVP, by decision rather than drift:

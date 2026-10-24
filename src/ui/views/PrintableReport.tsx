@@ -11,6 +11,7 @@ import { formatSignedUSD, formatUSD } from '../../money/money';
 import type { BudgetPosition } from '../../engine/offer';
 import { formatYearMonthLong } from '../../engine/dates';
 import { COMPONENT_LABEL } from '../../domain/types';
+import { describeBasePayChange } from '../../engine/adjustments';
 
 /**
  * Budget position. The word is always present, so the meaning never rests on
@@ -66,6 +67,8 @@ export function PrintableReport({
             <dd>{dataset.department.name}</dd>
             <dt>Fiscal year</dt>
             <dd>{dataset.fiscalYear.label}</dd>
+            <dt>Offer B base-pay changes</dt>
+            <dd>{describeBasePayChange(dataset.offers.B)}</dd>
             <dt>Generated on</dt>
             <dd>{generatedOn}</dd>
             <dt>Prepared with</dt>
@@ -164,6 +167,9 @@ export function PrintableReport({
               </tbody>
             </table>
           </div>
+          <p className="state-note" style={{ marginTop: '0.5rem' }}>
+            A negative amount is a decrease from baseline (a saving).
+          </p>
         </section>
 
         <section>

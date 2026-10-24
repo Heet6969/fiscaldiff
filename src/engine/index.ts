@@ -13,6 +13,7 @@ export * from './offer';
 export * from './overtime';
 export * from './flags';
 export * from './reconcile';
+export * from './adjustments';
 export * from './statedCheck';
 export * from './comparators';
 

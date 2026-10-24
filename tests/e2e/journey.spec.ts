@@ -96,8 +96,12 @@ test.describe('core journey', () => {
 
     // Offer B is untouched.
     expect(await increaseRow.locator('td').nth(1).innerText()).toBe(bBefore);
+    // Offer B now holds its change as rows; its single Increase row still reads 2.5.
     await expect(
-      page.getByRole('group', { name: /Offer B/ }).getByLabel('Base-pay raise (percent)'),
+      page
+        .getByRole('group', { name: /Offer B/ })
+        .getByRole('group', { name: 'Adjustment 1' })
+        .getByLabel('Percentage (percent)'),
     ).toHaveValue('2.5');
   });
 
